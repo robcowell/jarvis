@@ -17,6 +17,7 @@ _event_lock = threading.Lock()
 _event_id = 0
 _events = deque(maxlen=80)
 _wake_service = None
+_wake_status = "Off"
 
 
 def _emit_event(event_type, payload):
@@ -33,6 +34,15 @@ def _emit_event(event_type, payload):
 def _get_events_since(since_id):
     with _event_lock:
         return [event for event in _events if event["id"] > since_id]
+
+
+def _set_wake_status(status, detail=""):
+    global _wake_status
+    _wake_status = status
+    _emit_event("wake_status", {
+        "status": status,
+        "detail": detail
+    })
 
 
 def _voice_pipeline(source="touch", emit_events=False):
@@ -107,6 +117,7 @@ def _start_wake_listener():
     global _wake_service
 
     if not wake_listener.WAKE_ALWAYS_LISTEN_ENABLED:
+        _set_wake_status("Off", "Always-listening wake mode disabled")
         return
 
     if _wake_service is not None:
@@ -130,6 +141,7 @@ def _start_wake_listener():
             })
 
     def on_error(message):
+        _set_wake_status("Error", message)
         _emit_event("voice_result", {
             "ok": False,
             "source": "wake_word",
@@ -138,6 +150,7 @@ def _start_wake_listener():
 
     _wake_service = wake_listener.PorcupineWakeListener(on_detect=on_detect, on_error=on_error)
     _wake_service.start()
+    _set_wake_status("Armed", "Listening for wake word")
 
 
 @app.route("/")

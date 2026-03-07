@@ -21,6 +21,7 @@ const ui = {
   footerNet: document.getElementById("footerNet"),
   clockTop: document.getElementById("clockTop"),
   clockBottom: document.getElementById("clockBottom"),
+  wakeStatus: document.getElementById("wakeStatus"),
   cpuVal: document.getElementById("cpuVal"),
   tempVal: document.getElementById("tempVal")
 };
@@ -87,6 +88,26 @@ function updateLatency(t0) {
   ui.latencyValue.innerText = latency;
 }
 
+function setWakeStatus(status, detail = "") {
+  const normalized = (status || "Off").toLowerCase();
+  ui.wakeStatus.classList.remove("wake-armed", "wake-off", "wake-error");
+
+  if (normalized === "armed") {
+    ui.wakeStatus.classList.add("wake-armed");
+    ui.wakeStatus.innerText = "Armed";
+  } else if (normalized === "error") {
+    ui.wakeStatus.classList.add("wake-error");
+    ui.wakeStatus.innerText = "Error";
+  } else {
+    ui.wakeStatus.classList.add("wake-off");
+    ui.wakeStatus.innerText = "Off";
+  }
+
+  if (detail) {
+    ui.wakeStatus.title = detail;
+  }
+}
+
 function handleVoiceResult(data) {
   if (data.ok) {
     requestCount += 1;
@@ -133,6 +154,11 @@ function handleVoiceResult(data) {
 }
 
 function handleServerEvent(event) {
+  if (event.type === "wake_status") {
+    setWakeStatus(event.payload.status, event.payload.detail);
+    return;
+  }
+
   if (event.type === "wake_detected") {
     ui.lastAction.innerText = "Wake word request";
     ui.inputMode.innerText = "Voice";
@@ -198,6 +224,7 @@ async function listen() {
 ui.voiceCore.addEventListener("click", listen);
 
 updateClocks();
+setWakeStatus("Off");
 setInterval(updateClocks, 1000);
 setInterval(pollEvents, 800);
 pollEvents();
