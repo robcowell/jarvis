@@ -27,7 +27,7 @@ Flask-based touchscreen voice assistant designed for Raspberry Pi kiosk use (800
 - `aplay` (usually from ALSA utilities)
 - Piper binary built/installed (for primary TTS)
 - `espeak` optional (fallback only)
-- PortAudio runtime/dev packages are needed for `sounddevice`/`pyaudio` on Pi
+- PortAudio runtime/dev packages are needed for `sounddevice`/`pvrecorder` on Pi
 
 Piper is **not** installed by `pip`. You must install/build it separately on the Pi and point `PIPER_PATH` to the executable.
 
@@ -153,10 +153,11 @@ If unset, the SDK uses its built-in defaults.
   - Cooldown in seconds between accepted detections
 - `PORCUPINE_AUDIO_DEVICE_INDEX`
   - Default: unset
-  - Optional numeric input device index for Porcupine stream
-- `PORCUPINE_ACCESS_KEY`
+  - Optional numeric input device index for Porcupine `PvRecorder` stream
+- `PICOVOICE_ACCESS_KEY`
   - Default: unset
   - Optional Picovoice access key (required on some Porcupine SDK versions)
+  - Legacy fallback: `PORCUPINE_ACCESS_KEY` is still accepted
 
 ## Suggested `.env` Example
 
@@ -192,7 +193,7 @@ PORCUPINE_KEYWORDS="jarvis"
 PORCUPINE_SENSITIVITY="0.6"
 WAKE_DETECTION_COOLDOWN="1.5"
 # PORCUPINE_AUDIO_DEVICE_INDEX="1"
-# PORCUPINE_ACCESS_KEY="YOUR_PICOVOICE_ACCESS_KEY"
+# PICOVOICE_ACCESS_KEY="YOUR_PICOVOICE_ACCESS_KEY"
 ```
 
 ## Notes

@@ -1,5 +1,4 @@
 import os
-import struct
 import threading
 import time
 from typing import Callable, Optional
@@ -46,7 +45,10 @@ PORCUPINE_KEYWORDS = [part.strip() for part in os.getenv("PORCUPINE_KEYWORDS", "
 PORCUPINE_SENSITIVITY = _env_float("PORCUPINE_SENSITIVITY", 0.6, minimum=0.0)
 WAKE_DETECTION_COOLDOWN = _env_float("WAKE_DETECTION_COOLDOWN", 1.5, minimum=0.0)
 PORCUPINE_AUDIO_DEVICE_INDEX = _env_optional_int("PORCUPINE_AUDIO_DEVICE_INDEX")
-PORCUPINE_ACCESS_KEY = (os.getenv("PORCUPINE_ACCESS_KEY") or "").strip()
+PICOVOICE_ACCESS_KEY = (
+    (os.getenv("PICOVOICE_ACCESS_KEY") or "").strip()
+    or (os.getenv("PORCUPINE_ACCESS_KEY") or "").strip()
+)
 
 
 class PorcupineWakeListener:
@@ -74,12 +76,11 @@ class PorcupineWakeListener:
 
     def _run(self) -> None:
         porcupine = None
-        pa = None
-        stream = None
+        recorder = None
 
         try:
             import pvporcupine
-            import pyaudio
+            from pvrecorder import PvRecorder
 
             if not PORCUPINE_KEYWORDS:
                 raise RuntimeError("PORCUPINE_KEYWORDS is empty")
@@ -88,8 +89,8 @@ class PorcupineWakeListener:
                 "keywords": PORCUPINE_KEYWORDS,
                 "sensitivities": [PORCUPINE_SENSITIVITY] * len(PORCUPINE_KEYWORDS),
             }
-            if PORCUPINE_ACCESS_KEY:
-                create_args["access_key"] = PORCUPINE_ACCESS_KEY
+            if PICOVOICE_ACCESS_KEY:
+                create_args["access_key"] = PICOVOICE_ACCESS_KEY
 
             try:
                 porcupine = pvporcupine.create(**create_args)
@@ -97,26 +98,25 @@ class PorcupineWakeListener:
                 # Compatibility for SDK variants that strictly require access_key.
                 if "access_key" not in create_args:
                     raise RuntimeError(
-                        "Porcupine access key may be required. Set PORCUPINE_ACCESS_KEY."
+                        "Porcupine access key may be required. Set PICOVOICE_ACCESS_KEY."
                     )
                 raise
 
-            pa = pyaudio.PyAudio()
-            stream = pa.open(
-                rate=porcupine.sample_rate,
-                channels=1,
-                format=pyaudio.paInt16,
-                input=True,
-                frames_per_buffer=porcupine.frame_length,
-                input_device_index=PORCUPINE_AUDIO_DEVICE_INDEX,
+            recorder = PvRecorder(
+                device_index=PORCUPINE_AUDIO_DEVICE_INDEX if PORCUPINE_AUDIO_DEVICE_INDEX is not None else -1,
+                frame_length=porcupine.frame_length,
             )
+            recorder.start()
 
-            print(f"Wake listener active (keywords={PORCUPINE_KEYWORDS}, sensitivity={PORCUPINE_SENSITIVITY})")
+            print(
+                "Wake listener active "
+                f"(keywords={PORCUPINE_KEYWORDS}, sensitivity={PORCUPINE_SENSITIVITY}, "
+                f"device_index={'default' if PORCUPINE_AUDIO_DEVICE_INDEX is None else PORCUPINE_AUDIO_DEVICE_INDEX})"
+            )
             last_detected_at = 0.0
 
             while not self._stop_event.is_set():
-                frame = stream.read(porcupine.frame_length, exception_on_overflow=False)
-                pcm = struct.unpack_from("h" * porcupine.frame_length, frame)
+                pcm = recorder.read()
                 result = porcupine.process(pcm)
                 if result < 0:
                     continue
@@ -134,9 +134,16 @@ class PorcupineWakeListener:
             if self._on_error:
                 self._on_error(message)
         finally:
-            if stream is not None:
-                stream.close()
-            if pa is not None:
-                pa.terminate()
+            if recorder is not None:
+                try:
+                    recorder.stop()
+                finally:
+                    recorder.delete()
             if porcupine is not None:
                 porcupine.delete()
+
+
+def list_wake_input_devices() -> list[str]:
+    from pvrecorder import PvRecorder
+
+    return PvRecorder.get_available_devices()

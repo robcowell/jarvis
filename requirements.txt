@@ -4,4 +4,4 @@ sounddevice
 scipy
 numpy
 pvporcupine
-pyaudio
+pvrecorder
