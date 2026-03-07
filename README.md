@@ -27,6 +27,7 @@ Flask-based touchscreen voice assistant designed for Raspberry Pi kiosk use (800
 - `aplay` (usually from ALSA utilities)
 - Piper binary built/installed (for primary TTS)
 - `espeak` optional (fallback only)
+- PortAudio runtime/dev packages are needed for `sounddevice`/`pyaudio` on Pi
 
 Piper is **not** installed by `pip`. You must install/build it separately on the Pi and point `PIPER_PATH` to the executable.
 
@@ -35,7 +36,7 @@ Piper is **not** installed by `pip`. You must install/build it separately on the
 Install from your environment:
 
 ```bash
-pip install flask openai sounddevice scipy numpy
+pip install -r requirements.txt
 ```
 
 ## Run
@@ -124,6 +125,39 @@ If unset, the SDK uses its built-in defaults.
   - Number of chunks buffered before trigger and prepended to capture
   - Minimum clamp: `1`
 
+## Wake word (wakeword.py)
+
+- `WAKE_WORD_ENABLED`
+  - Default: `true`
+  - Enable/disable wake-word requirement on `/listen`
+  - Accepted false values: `0`, `false`, `no`, `off`
+- `WAKE_WORDS`
+  - Default: `jarvis`
+  - Comma-separated wake words (first entry is used in user-facing prompts)
+  - Example: `jarvis,hey jarvis`
+
+## Always-listening wake mode (wake_listener.py)
+
+- `WAKE_ALWAYS_LISTEN_ENABLED`
+  - Default: `false`
+  - Enables background Porcupine wake-word listening as an alternative to push-to-talk
+- `PORCUPINE_KEYWORDS`
+  - Default: `jarvis`
+  - Comma-separated built-in Porcupine keywords
+  - Example: `jarvis,computer`
+- `PORCUPINE_SENSITIVITY`
+  - Default: `0.6`
+  - Detection sensitivity (`0.0` to `1.0`)
+- `WAKE_DETECTION_COOLDOWN`
+  - Default: `1.5`
+  - Cooldown in seconds between accepted detections
+- `PORCUPINE_AUDIO_DEVICE_INDEX`
+  - Default: unset
+  - Optional numeric input device index for Porcupine stream
+- `PORCUPINE_ACCESS_KEY`
+  - Default: unset
+  - Optional Picovoice access key (required on some Porcupine SDK versions)
+
 ## Suggested `.env` Example
 
 ```bash
@@ -147,10 +181,23 @@ VOICE_SILENCE_DURATION="0.65"
 VOICE_MIN_SPEECH_DURATION="0.30"
 VOICE_NO_SPEECH_TIMEOUT="1.6"
 VOICE_PRE_ROLL_CHUNKS="2"
+
+# Wake word
+WAKE_WORD_ENABLED="1"
+WAKE_WORDS="jarvis"
+
+# Always-listening wake mode (Porcupine)
+WAKE_ALWAYS_LISTEN_ENABLED="1"
+PORCUPINE_KEYWORDS="jarvis"
+PORCUPINE_SENSITIVITY="0.6"
+WAKE_DETECTION_COOLDOWN="1.5"
+# PORCUPINE_AUDIO_DEVICE_INDEX="1"
+# PORCUPINE_ACCESS_KEY="YOUR_PICOVOICE_ACCESS_KEY"
 ```
 
 ## Notes
 
-- `/listen` performs full pipeline: record -> transcribe -> generate -> speak.
+- `/listen` performs full pipeline: record -> transcribe -> (optional wake-word gate) -> generate -> speak.
 - `/ask` performs text-only pipeline: generate response (no TTS playback by default in current flow).
 - UI is tuned for 800x480 kiosk operation and low-overhead rendering on Pi 3 B+.
+- When `WAKE_ALWAYS_LISTEN_ENABLED=1`, a background Porcupine listener triggers the same voice pipeline hands-free.

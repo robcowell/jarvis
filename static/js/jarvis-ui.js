@@ -1,4 +1,5 @@
 let requestCount = 0;
+let lastEventId = 0;
 
 const ui = {
   status: document.getElementById("status"),
@@ -86,6 +87,88 @@ function updateLatency(t0) {
   ui.latencyValue.innerText = latency;
 }
 
+function handleVoiceResult(data) {
+  if (data.ok) {
+    requestCount += 1;
+    ui.requestCount.innerText = String(requestCount);
+    setBoxText(ui.heard, data.text || "(No transcript)");
+    setBoxText(ui.response, data.response || "(No response)");
+    setStatus("Speaking...", "Response ready");
+    appendTelemetry(
+      data.source === "wake_word"
+        ? "Wake word request completed."
+        : "Voice response generated."
+    );
+
+    setTimeout(() => {
+      setStatus("Idle", "Touch the core to speak");
+    }, 900);
+    return;
+  }
+
+  if (data.wake_word_missing || data.wake_word_only) {
+    setBoxText(ui.heard, data.text || "(No transcript)");
+    setBoxText(ui.response, data.error || "Wake word required.");
+    setStatus("Idle", data.error || "Say the wake word to begin");
+    appendTelemetry(
+      data.wake_word_missing
+        ? "Wake word not detected."
+        : "Wake word detected without follow-up command."
+    );
+    return;
+  }
+
+  if (data.busy) {
+    setStatus("Idle", "Previous request still running");
+    appendTelemetry("Voice request skipped: pipeline busy.");
+    return;
+  }
+
+  setBoxText(ui.response, data.error || "Unknown error");
+  setBoxText(ui.heard, "Input unavailable.");
+  setStatus("Error", data.error || "Voice request failed");
+  ui.micStatus.innerText = "Check input";
+  ui.footerMic.innerText = "Issue";
+  appendTelemetry(`Error: ${data.error || "Unknown error"}`);
+}
+
+function handleServerEvent(event) {
+  if (event.type === "wake_detected") {
+    ui.lastAction.innerText = "Wake word request";
+    ui.inputMode.innerText = "Voice";
+    appendTelemetry(`Wake word detected: ${event.payload.keyword}`);
+    return;
+  }
+
+  if (event.type === "voice_state") {
+    setStatus(event.payload.state || "Thinking...", event.payload.subtext || "");
+    return;
+  }
+
+  if (event.type === "voice_result") {
+    handleVoiceResult(event.payload || {});
+  }
+}
+
+async function pollEvents() {
+  try {
+    const response = await fetch(`/events?since=${lastEventId}`);
+    const data = await response.json();
+    if (!data.ok || !Array.isArray(data.events)) {
+      return;
+    }
+
+    for (const event of data.events) {
+      if (typeof event.id === "number" && event.id > lastEventId) {
+        lastEventId = event.id;
+      }
+      handleServerEvent(event);
+    }
+  } catch (err) {
+    // Keep polling silently; transient network hiccups are expected.
+  }
+}
+
 async function listen() {
   const t0 = performance.now();
 
@@ -100,26 +183,7 @@ async function listen() {
     const response = await fetch("/listen");
     setStatus("Thinking...", "Transcribing and generating response");
     const data = await response.json();
-
-    if (data.ok) {
-      requestCount += 1;
-      ui.requestCount.innerText = String(requestCount);
-      setBoxText(ui.heard, data.text || "(No transcript)");
-      setBoxText(ui.response, data.response || "(No response)");
-      setStatus("Speaking...", "Response ready");
-      appendTelemetry("Voice response generated.");
-
-      setTimeout(() => {
-        setStatus("Idle", "Touch the core to speak");
-      }, 900);
-    } else {
-      setBoxText(ui.response, data.error || "Unknown error");
-      setBoxText(ui.heard, "Input unavailable.");
-      setStatus("Error", data.error || "Voice request failed");
-      ui.micStatus.innerText = "Check input";
-      ui.footerMic.innerText = "Issue";
-      appendTelemetry(`Error: ${data.error || "Unknown error"}`);
-    }
+    handleVoiceResult({ ...data, source: "touch" });
   } catch (err) {
     setBoxText(ui.response, String(err));
     setStatus("Error", "Network or server problem");
@@ -135,6 +199,8 @@ ui.voiceCore.addEventListener("click", listen);
 
 updateClocks();
 setInterval(updateClocks, 1000);
+setInterval(pollEvents, 800);
+pollEvents();
 
 // Lightweight simulated diagnostics keep the footer lively in offline/demo mode.
 setInterval(() => {
