@@ -102,11 +102,23 @@ class PorcupineWakeListener:
                     )
                 raise
 
-            recorder = PvRecorder(
-                device_index=PORCUPINE_AUDIO_DEVICE_INDEX if PORCUPINE_AUDIO_DEVICE_INDEX is not None else -1,
-                frame_length=porcupine.frame_length,
-            )
-            recorder.start()
+            def create_recorder():
+                active = PvRecorder(
+                    device_index=PORCUPINE_AUDIO_DEVICE_INDEX if PORCUPINE_AUDIO_DEVICE_INDEX is not None else -1,
+                    frame_length=porcupine.frame_length,
+                )
+                active.start()
+                return active
+
+            def destroy_recorder(active):
+                if active is None:
+                    return
+                try:
+                    active.stop()
+                finally:
+                    active.delete()
+
+            recorder = create_recorder()
 
             print(
                 "Wake listener active "
@@ -127,7 +139,15 @@ class PorcupineWakeListener:
                 last_detected_at = now
 
                 keyword = PORCUPINE_KEYWORDS[result] if result < len(PORCUPINE_KEYWORDS) else "wake-word"
-                self._on_detect(keyword)
+                # Explicit mic handoff: release wake recorder before main speech capture starts.
+                destroy_recorder(recorder)
+                recorder = None
+
+                try:
+                    self._on_detect(keyword)
+                finally:
+                    if not self._stop_event.is_set():
+                        recorder = create_recorder()
         except Exception as exc:
             message = f"Wake listener failed: {exc}"
             print(message)
@@ -135,10 +155,7 @@ class PorcupineWakeListener:
                 self._on_error(message)
         finally:
             if recorder is not None:
-                try:
-                    recorder.stop()
-                finally:
-                    recorder.delete()
+                destroy_recorder(recorder)
             if porcupine is not None:
                 porcupine.delete()
 
