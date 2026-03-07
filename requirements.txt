@@ -1,7 +1,5 @@
 flask
 openai
-sounddevice
-scipy
 numpy
 pvporcupine
 pvrecorder

@@ -1,8 +1,9 @@
 import os
-import sounddevice as sd
-import numpy as np
-from scipy.io.wavfile import write
+import wave
 from collections import deque
+
+import numpy as np
+from pvrecorder import PvRecorder
 
 
 def _env_float(name, fallback, minimum=None):
@@ -37,24 +38,19 @@ def _env_int(name, fallback, minimum=None):
 
 # Speech endpoint defaults (overridable via environment variables).
 DEFAULT_MAX_DURATION = _env_float("VOICE_MAX_DURATION", 6.0, minimum=0.5)
-DEFAULT_SAMPLE_RATE = _env_int("VOICE_SAMPLE_RATE", 48000, minimum=8000)
+DEFAULT_SAMPLE_RATE = _env_int("VOICE_SAMPLE_RATE", 16000, minimum=8000)
 DEFAULT_CHUNK_SIZE = _env_int("VOICE_CHUNK_SIZE", 1024, minimum=128)
 DEFAULT_SPEECH_THRESHOLD = _env_float("VOICE_SPEECH_THRESHOLD", 0.012, minimum=0.001)
 DEFAULT_SILENCE_DURATION = _env_float("VOICE_SILENCE_DURATION", 0.75, minimum=0.1)
 DEFAULT_MIN_SPEECH_DURATION = _env_float("VOICE_MIN_SPEECH_DURATION", 0.35, minimum=0.1)
 DEFAULT_NO_SPEECH_TIMEOUT = _env_float("VOICE_NO_SPEECH_TIMEOUT", 2.0, minimum=0.2)
 DEFAULT_PRE_ROLL_CHUNKS = _env_int("VOICE_PRE_ROLL_CHUNKS", 2, minimum=1)
+DEFAULT_DEVICE_INDEX = _env_int("VOICE_AUDIO_DEVICE_INDEX", -1, minimum=-1)
 
 
 def get_input_devices():
-    devices = sd.query_devices()
-    input_devices = []
-
-    for i, device in enumerate(devices):
-        if device["max_input_channels"] > 0:
-            input_devices.append((i, device["name"]))
-
-    return input_devices
+    devices = PvRecorder.get_available_devices()
+    return [(i, name) for i, name in enumerate(devices)]
 
 
 def has_input_device():
@@ -77,10 +73,21 @@ def record_audio(
     if not input_devices:
         raise RuntimeError("No audio input device detected")
 
-    if device is None:
-        device = input_devices[0][0]
+    device_index = device if device is not None else DEFAULT_DEVICE_INDEX
+    if device_index == -1:
+        # -1 means default input device for PvRecorder.
+        selected_label = "default"
+    elif device_index < 0 or device_index >= len(input_devices):
+        raise RuntimeError(f"Invalid VOICE_AUDIO_DEVICE_INDEX/device value: {device_index}")
+    else:
+        selected_label = f"{device_index} ({input_devices[device_index][1]})"
 
-    print(f"Recording using device {device} (speech endpoint mode)...")
+    print(f"Recording using device {selected_label} (PvRecorder speech endpoint mode)...")
+
+    # PvRecorder captures mono 16-bit PCM at 16kHz for speech workflows.
+    if fs != 16000:
+        print(f"VOICE_SAMPLE_RATE={fs} requested; using 16000 for PvRecorder compatibility.")
+        fs = 16000
 
     max_chunks = max(1, int(max_duration * fs / chunk_size))
     silence_chunks_to_stop = max(1, int(silence_duration * fs / chunk_size))
@@ -93,20 +100,19 @@ def record_audio(
     speech_chunks = 0
     silent_after_speech = 0
 
-    with sd.InputStream(
-        samplerate=fs,
-        channels=1,
-        dtype="float32",
-        device=device,
-        blocksize=chunk_size
-    ) as stream:
+    recorder = None
+    try:
+        recorder = PvRecorder(
+            device_index=device_index,
+            frame_length=chunk_size,
+        )
+        recorder.start()
+
         for chunk_index in range(max_chunks):
-            chunk, overflowed = stream.read(chunk_size)
-
-            if overflowed:
-                print("Warning: audio input overflow detected")
-
-            rms = float(np.sqrt(np.mean(np.square(chunk))))
+            pcm = recorder.read()
+            chunk = np.asarray(pcm, dtype=np.int16)
+            chunk_f = chunk.astype(np.float32) / 32768.0
+            rms = float(np.sqrt(np.mean(np.square(chunk_f))))
 
             if not speech_started:
                 pre_roll.append(chunk.copy())
@@ -131,11 +137,21 @@ def record_audio(
             # Stop shortly after the user finishes speaking.
             if speech_chunks >= min_speech_chunks and silent_after_speech >= silence_chunks_to_stop:
                 break
+    finally:
+        if recorder is not None:
+            try:
+                recorder.stop()
+            finally:
+                recorder.delete()
 
     if not captured_chunks:
         raise RuntimeError("No speech captured")
 
-    audio = np.concatenate(captured_chunks, axis=0)
-    write(filename, fs, audio)
+    audio = np.concatenate(captured_chunks, axis=0).astype(np.int16)
+    with wave.open(filename, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)  # 16-bit PCM
+        wf.setframerate(fs)
+        wf.writeframes(audio.tobytes())
     print(f"Saved {filename}")
     return filename

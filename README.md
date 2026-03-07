@@ -27,7 +27,7 @@ Flask-based touchscreen voice assistant designed for Raspberry Pi kiosk use (800
 - `aplay` (usually from ALSA utilities)
 - Piper binary built/installed (for primary TTS)
 - `espeak` optional (fallback only)
-- PortAudio runtime/dev packages are needed for `sounddevice`/`pvrecorder` on Pi
+- PortAudio runtime/dev packages are needed for `pvrecorder` on Pi
 
 Piper is **not** installed by `pip`. You must install/build it separately on the Pi and point `PIPER_PATH` to the executable.
 
@@ -99,6 +99,7 @@ If unset, the SDK uses its built-in defaults.
 - `VOICE_SAMPLE_RATE`
   - Default: `16000`
   - Input sample rate (Hz)
+  - `PvRecorder` path currently records at 16kHz; non-16k values are coerced to `16000`
   - Minimum clamp: `8000`
 - `VOICE_CHUNK_SIZE`
   - Default: `1024`
@@ -124,6 +125,9 @@ If unset, the SDK uses its built-in defaults.
   - Default: `2`
   - Number of chunks buffered before trigger and prepended to capture
   - Minimum clamp: `1`
+- `VOICE_AUDIO_DEVICE_INDEX`
+  - Default: `-1`
+  - Device index used by `PvRecorder` for main speech capture (`-1` = default input)
 
 ## Wake word (wakeword.py)
 
@@ -158,6 +162,12 @@ If unset, the SDK uses its built-in defaults.
   - Default: unset
   - Optional Picovoice access key (required on some Porcupine SDK versions)
   - Legacy fallback: `PORCUPINE_ACCESS_KEY` is still accepted
+- `WAKE_RECORDER_RESTART_RETRIES`
+  - Default: `8`
+  - Number of attempts to restart wake recorder after handing mic back from main pipeline
+- `WAKE_RECORDER_RESTART_DELAY`
+  - Default: `0.15`
+  - Delay in seconds between wake recorder restart attempts
 
 ## Suggested `.env` Example
 
@@ -182,6 +192,7 @@ VOICE_SILENCE_DURATION="0.65"
 VOICE_MIN_SPEECH_DURATION="0.30"
 VOICE_NO_SPEECH_TIMEOUT="1.6"
 VOICE_PRE_ROLL_CHUNKS="2"
+VOICE_AUDIO_DEVICE_INDEX="-1"
 
 # Wake word
 WAKE_WORD_ENABLED="1"
@@ -194,6 +205,8 @@ PORCUPINE_SENSITIVITY="0.6"
 WAKE_DETECTION_COOLDOWN="1.5"
 # PORCUPINE_AUDIO_DEVICE_INDEX="1"
 # PICOVOICE_ACCESS_KEY="YOUR_PICOVOICE_ACCESS_KEY"
+WAKE_RECORDER_RESTART_RETRIES="8"
+WAKE_RECORDER_RESTART_DELAY="0.15"
 ```
 
 ## Notes

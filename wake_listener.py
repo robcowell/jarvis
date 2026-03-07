@@ -45,6 +45,8 @@ PORCUPINE_KEYWORDS = [part.strip() for part in os.getenv("PORCUPINE_KEYWORDS", "
 PORCUPINE_SENSITIVITY = _env_float("PORCUPINE_SENSITIVITY", 0.6, minimum=0.0)
 WAKE_DETECTION_COOLDOWN = _env_float("WAKE_DETECTION_COOLDOWN", 1.5, minimum=0.0)
 PORCUPINE_AUDIO_DEVICE_INDEX = _env_optional_int("PORCUPINE_AUDIO_DEVICE_INDEX")
+WAKE_RECORDER_RESTART_RETRIES = max(1, int(_env_float("WAKE_RECORDER_RESTART_RETRIES", 8, minimum=1)))
+WAKE_RECORDER_RESTART_DELAY = _env_float("WAKE_RECORDER_RESTART_DELAY", 0.15, minimum=0.01)
 PICOVOICE_ACCESS_KEY = (
     (os.getenv("PICOVOICE_ACCESS_KEY") or "").strip()
     or (os.getenv("PORCUPINE_ACCESS_KEY") or "").strip()
@@ -103,12 +105,19 @@ class PorcupineWakeListener:
                 raise
 
             def create_recorder():
-                active = PvRecorder(
-                    device_index=PORCUPINE_AUDIO_DEVICE_INDEX if PORCUPINE_AUDIO_DEVICE_INDEX is not None else -1,
-                    frame_length=porcupine.frame_length,
-                )
-                active.start()
-                return active
+                last_error = None
+                for attempt in range(1, WAKE_RECORDER_RESTART_RETRIES + 1):
+                    try:
+                        active = PvRecorder(
+                            device_index=PORCUPINE_AUDIO_DEVICE_INDEX if PORCUPINE_AUDIO_DEVICE_INDEX is not None else -1,
+                            frame_length=porcupine.frame_length,
+                        )
+                        active.start()
+                        return active
+                    except Exception as exc:
+                        last_error = exc
+                        time.sleep(WAKE_RECORDER_RESTART_DELAY)
+                raise RuntimeError(f"Failed to start wake recorder: {last_error}")
 
             def destroy_recorder(active):
                 if active is None:
