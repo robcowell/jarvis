@@ -29,6 +29,17 @@ _console_device_id = os.getenv("JARVIS_DEVICE_ID", "pi-console")
 _console_location = os.getenv("JARVIS_DEVICE_LOCATION", "unknown")
 
 
+def _parse_tts_mode(value: str) -> str:
+    normalized = (value or "").strip().lower()
+    allowed = {"auto_fallback", "core_only", "local_only"}
+    if normalized in allowed:
+        return normalized
+    return "auto_fallback"
+
+
+_tts_mode = _parse_tts_mode(os.getenv("JARVIS_TTS_MODE", "auto_fallback"))
+
+
 def _emit_event(event_type, payload):
     global _event_id
     with _event_lock:
@@ -140,7 +151,34 @@ def _voice_pipeline(source="touch", emit_events=False):
                 "source": source
             })
 
-        if using_core:
+        if _tts_mode == "local_only":
+            speak.speak(response)
+        elif _tts_mode == "core_only":
+            if not using_core:
+                return {
+                    "ok": False,
+                    "text": text,
+                    "prompt_text": prompt_text,
+                    "response": response,
+                    "error": "JARVIS_TTS_MODE=core_only but JARVIS_CORE_URL is not configured"
+                }
+            try:
+                wav = core_client.tts(response)
+                speak.play_wav_bytes(wav)
+            except core_client.CoreUnavailableError as exc:
+                _emit_event("core_status", {
+                    "ok": False,
+                    "error": str(exc),
+                    "stage": "tts"
+                })
+                return {
+                    "ok": False,
+                    "text": text,
+                    "prompt_text": prompt_text,
+                    "response": response,
+                    "error": f"Core TTS unavailable in core_only mode: {exc}"
+                }
+        elif using_core:
             try:
                 wav = core_client.tts(response)
                 speak.play_wav_bytes(wav)
@@ -159,7 +197,8 @@ def _voice_pipeline(source="touch", emit_events=False):
             "text": text,
             "prompt_text": prompt_text,
             "response": response,
-            "processing": "core" if using_core else "local"
+            "processing": "core" if using_core else "local",
+            "tts_mode": _tts_mode
         }
     finally:
         _voice_lock.release()

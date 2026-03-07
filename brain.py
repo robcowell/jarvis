@@ -12,7 +12,7 @@ def ask_jarvis(text):
     """
 
     response = client.responses.create(
-        model="gpt-5.3",
+        model="gpt-5",
         input=prompt
     )
 

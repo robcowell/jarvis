@@ -114,6 +114,11 @@ This section lists all environment variables used for configuration across the p
 - `JARVIS_CORE_TIMEOUT_SECONDS`
   - Default: `20`
   - Request timeout for Core API calls.
+- `JARVIS_TTS_MODE`
+  - Default: `auto_fallback`
+  - `auto_fallback` = try Core TTS then fallback local.
+  - `core_only` = use Core TTS only (no local TTS fallback).
+  - `local_only` = use Pi local TTS only (no Core TTS).
 
 Core-specific optional model overrides:
 
@@ -121,6 +126,7 @@ Core-specific optional model overrides:
 - `JARVIS_TRANSCRIBE_MODEL` (default: `gpt-4o-mini-transcribe`)
 - `JARVIS_TTS_MODEL` (default: `gpt-4o-mini-tts`)
 - `JARVIS_TTS_VOICE` (default: `alloy`)
+- `JARVIS_TTS_INSTRUCTIONS` (default: `Speak in clear British English with a consistent, natural assistant tone.`)
 
 ## OpenAI (optional SDK-level)
 
@@ -238,12 +244,24 @@ If unset, the SDK uses its built-in defaults.
 # Required
 OPENAI_API_KEY="sk-..."
 
+# Distributed console mode
+JARVIS_CORE_URL="http://192.168.1.100:8000"
+JARVIS_DEVICE_ID="pi-console-1"
+JARVIS_DEVICE_LOCATION="office"
+JARVIS_CORE_TIMEOUT_SECONDS="20"
+JARVIS_TTS_MODE="core_only"
+
+# Core TTS style
+JARVIS_TTS_VOICE="alloy"
+JARVIS_TTS_INSTRUCTIONS="Speak in clear British English with a consistent, natural assistant tone."
+
 # Piper TTS
 PIPER_PATH="/home/robcowell/piper/build/piper"
-PIPER_MODEL_PATH="/home/robcowell/piper/voices/en_US-lessac-medium.onnx"
+# Use a British model path if you run local-only TTS.
+PIPER_MODEL_PATH="/home/robcowell/piper/voices/en_GB-voice.onnx"
 PIPER_SAMPLE_RATE="22050"
 APLAY_PATH="aplay"
-TTS_FALLBACK_TO_ESPEAK="1"
+TTS_FALLBACK_TO_ESPEAK="0"
 ESPEAK_PATH="espeak"
 
 # Voice endpoint detection
