@@ -21,10 +21,17 @@ const ui = {
   clockTop: document.getElementById("clockTop"),
   clockBottom: document.getElementById("clockBottom"),
   cpuVal: document.getElementById("cpuVal"),
-  tempVal: document.getElementById("tempVal"),
-  textInput: document.getElementById("textInput"),
-  sendBtn: document.getElementById("sendBtn")
+  tempVal: document.getElementById("tempVal")
 };
+
+function stickToBottom(element) {
+  element.scrollTop = element.scrollHeight;
+}
+
+function setBoxText(element, text) {
+  element.innerText = text;
+  stickToBottom(element);
+}
 
 function setStatus(state, subtext) {
   ui.status.className = "status-value";
@@ -64,7 +71,8 @@ function setStatus(state, subtext) {
 
 function appendTelemetry(text) {
   const stamp = new Date().toLocaleTimeString();
-  ui.telemetry.innerText = `[${stamp}] ${text}\n${ui.telemetry.innerText}`;
+  ui.telemetry.innerText = `${ui.telemetry.innerText}\n[${stamp}] ${text}`;
+  stickToBottom(ui.telemetry);
 }
 
 function updateClocks() {
@@ -82,8 +90,8 @@ async function listen() {
   const t0 = performance.now();
 
   setStatus("Listening...", "Recording request");
-  ui.heard.innerText = "Listening for speech...";
-  ui.response.innerText = "";
+  setBoxText(ui.heard, "Listening for speech...");
+  setBoxText(ui.response, "");
   ui.lastAction.innerText = "Voice request";
   ui.inputMode.innerText = "Voice";
   appendTelemetry("Voice capture started.");
@@ -96,8 +104,8 @@ async function listen() {
     if (data.ok) {
       requestCount += 1;
       ui.requestCount.innerText = String(requestCount);
-      ui.heard.innerText = data.text || "(No transcript)";
-      ui.response.innerText = data.response || "(No response)";
+      setBoxText(ui.heard, data.text || "(No transcript)");
+      setBoxText(ui.response, data.response || "(No response)");
       setStatus("Speaking...", "Response ready");
       appendTelemetry("Voice response generated.");
 
@@ -105,15 +113,15 @@ async function listen() {
         setStatus("Idle", "Touch the core to speak");
       }, 900);
     } else {
-      ui.response.innerText = data.error || "Unknown error";
-      ui.heard.innerText = "Input unavailable.";
+      setBoxText(ui.response, data.error || "Unknown error");
+      setBoxText(ui.heard, "Input unavailable.");
       setStatus("Error", data.error || "Voice request failed");
       ui.micStatus.innerText = "Check input";
       ui.footerMic.innerText = "Issue";
       appendTelemetry(`Error: ${data.error || "Unknown error"}`);
     }
   } catch (err) {
-    ui.response.innerText = String(err);
+    setBoxText(ui.response, String(err));
     setStatus("Error", "Network or server problem");
     ui.netStatus.innerText = "Error";
     ui.footerNet.innerText = "Error";
@@ -123,58 +131,7 @@ async function listen() {
   }
 }
 
-async function askText() {
-  const text = ui.textInput.value.trim();
-  if (!text) {
-    return;
-  }
-
-  const t0 = performance.now();
-  setStatus("Thinking...", "Processing typed request");
-  ui.heard.innerText = text;
-  ui.response.innerText = "";
-  ui.lastAction.innerText = "Text request";
-  ui.inputMode.innerText = "Text";
-  appendTelemetry("Typed request submitted.");
-
-  try {
-    const formData = new FormData();
-    formData.append("text", text);
-
-    const response = await fetch("/ask", {
-      method: "POST",
-      body: formData
-    });
-    const data = await response.json();
-
-    if (data.ok) {
-      requestCount += 1;
-      ui.requestCount.innerText = String(requestCount);
-      ui.response.innerText = data.response || "(No response)";
-      ui.textInput.value = "";
-      setStatus("Idle", "Touch the core to speak");
-      appendTelemetry("Typed response generated.");
-    } else {
-      ui.response.innerText = data.error || "Unknown error";
-      setStatus("Error", data.error || "Typed request failed");
-      appendTelemetry(`Error: ${data.error || "Unknown error"}`);
-    }
-  } catch (err) {
-    ui.response.innerText = String(err);
-    setStatus("Error", "Network or server problem");
-    appendTelemetry(`Fetch failed: ${err}`);
-  } finally {
-    updateLatency(t0);
-  }
-}
-
 ui.voiceCore.addEventListener("click", listen);
-ui.sendBtn.addEventListener("click", askText);
-ui.textInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
-    askText();
-  }
-});
 
 updateClocks();
 setInterval(updateClocks, 1000);
@@ -184,3 +141,7 @@ setInterval(() => {
   ui.cpuVal.innerText = `${18 + Math.floor(Math.random() * 18)}%`;
   ui.tempVal.innerText = `${45 + Math.floor(Math.random() * 8)}C`;
 }, 3000);
+
+stickToBottom(ui.heard);
+stickToBottom(ui.response);
+stickToBottom(ui.telemetry);
