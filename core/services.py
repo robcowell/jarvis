@@ -5,7 +5,7 @@ from openai import OpenAI
 
 
 _client = OpenAI()
-_CHAT_MODEL = os.getenv("JARVIS_COMMAND_MODEL", "gpt-4.1-mini")
+_CHAT_MODEL = os.getenv("JARVIS_COMMAND_MODEL", "gpt-5.3")
 _TRANSCRIBE_MODEL = os.getenv("JARVIS_TRANSCRIBE_MODEL", "gpt-4o-mini-transcribe")
 _TTS_MODEL = os.getenv("JARVIS_TTS_MODEL", "gpt-4o-mini-tts")
 _TTS_VOICE = os.getenv("JARVIS_TTS_VOICE", "alloy")

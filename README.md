@@ -117,7 +117,7 @@ This section lists all environment variables used for configuration across the p
 
 Core-specific optional model overrides:
 
-- `JARVIS_COMMAND_MODEL` (default: `gpt-4.1-mini`)
+- `JARVIS_COMMAND_MODEL` (default: `gpt-5.3`)
 - `JARVIS_TRANSCRIBE_MODEL` (default: `gpt-4o-mini-transcribe`)
 - `JARVIS_TTS_MODEL` (default: `gpt-4o-mini-tts`)
 - `JARVIS_TTS_VOICE` (default: `alloy`)
