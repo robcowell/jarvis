@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RobOS Console</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/robos.css') }}">
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div class="brand">ROBOS</div>
+      <div class="top-metric">
+        Mode
+        <strong id="modeLabel">Voice Console</strong>
+      </div>
+      <div class="top-metric">
+        Local Time
+        <strong id="clockTop">--:--:--</strong>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="left">
+        <div class="panel status-panel">
+          <div class="panel-header">System Status</div>
+          <div id="status" class="status-value status-idle">Idle</div>
+          <div id="statusSub" class="status-sub">Touch the core to speak</div>
+        </div>
+
+        <div class="panel scroll-panel">
+          <div class="panel-header">Transcript</div>
+          <div id="heard" class="content-box transcript-box">Awaiting input…</div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">Input Diagnostics</div>
+          <div class="diag-grid">
+            <div class="diag">
+              <div class="diag-label">Microphone</div>
+              <div id="micStatus" class="diag-value">Ready</div>
+            </div>
+            <div class="diag">
+              <div class="diag-label">Network</div>
+              <div id="netStatus" class="diag-value">Online</div>
+            </div>
+            <div class="diag">
+              <div class="diag-label">Input Mode</div>
+              <div id="inputMode" class="diag-value">Voice</div>
+            </div>
+            <div class="diag">
+              <div class="diag-label">Last Action</div>
+              <div id="lastAction" class="diag-value">None</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="center">
+        <div class="panel center-hero">
+          <div class="core-wrap">
+  <div class="ring"></div>
+  <div class="ring-dots"></div>
+  <div class="ring2"></div>
+  <div class="ring3"></div>
+
+  <button id="voiceCore" class="voice-core" onclick="listen()">
+    <div>
+      Talk
+      <div class="wave" id="wave" style="display:none;">
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+      </div>
+    </div>
+  </button>
+</div>
+          <div class="hero-caption" id="heroCaption">
+            Touch interface engaged
+          </div>
+        </div>
+
+        <div class="panel composer">
+          <input
+            id="textInput"
+            class="text-input"
+            type="text"
+            placeholder="Type a request for RobOS"
+            autocomplete="off"
+          />
+          <button class="send-btn" onclick="askText()">Send</button>
+        </div>
+      </div>
+
+      <div class="right">
+        <div class="panel">
+          <div class="panel-header">Session</div>
+          <div class="diag-grid">
+            <div class="diag">
+              <div class="diag-label">Requests</div>
+              <div id="requestCount" class="diag-value">0</div>
+            </div>
+            <div class="diag">
+              <div class="diag-label">Last Latency</div>
+              <div id="latencyValue" class="diag-value">--</div>
+            </div>
+            <div class="diag">
+              <div class="diag-label">State</div>
+              <div id="sessionState" class="diag-value">Stable</div>
+            </div>
+            <div class="diag">
+              <div class="diag-label">Channel</div>
+              <div class="diag-value">Local UI</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel scroll-panel">
+          <div class="panel-header">Response</div>
+          <div id="response" class="content-box response-box">Responses will appear here.</div>
+        </div>
+
+        <div class="panel scroll-panel">
+          <div class="panel-header">Telemetry</div>
+          <div id="telemetry" class="content-box muted">System online.
+Voice pipeline initialized.
+Awaiting command…</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="footer-item">
+        Cpu
+        <strong id="cpuVal">--%</strong>
+      </div>
+      <div class="footer-item">
+        Temp
+        <strong id="tempVal">--°C</strong>
+      </div>
+      <div class="footer-item">
+        Mic
+        <strong id="footerMic">Ready</strong>
+      </div>
+      <div class="footer-item">
+        Network
+        <strong id="footerNet">Online</strong>
+      </div>
+      <div class="footer-item">
+        Clock
+        <strong id="clockBottom">--:--:--</strong>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let requestCount = 0;
+
+    function setStatus(state, subtext = "") {
+      const status = document.getElementById("status");
+      const statusSub = document.getElementById("statusSub");
+      const heroCaption = document.getElementById("heroCaption");
+      const core = document.getElementById("voiceCore");
+      const wave = document.getElementById("wave");
+      const sessionState = document.getElementById("sessionState");
+
+      status.className = "status-value";
+      core.classList.remove("busy");
+      wave.style.display = "none";
+
+      if (state === "Idle") {
+        status.classList.add("status-idle");
+        heroCaption.innerText = "Touch interface engaged";
+        sessionState.innerText = "Stable";
+      } else if (state === "Listening...") {
+        status.classList.add("status-listening");
+        core.classList.add("busy");
+        wave.style.display = "flex";
+        heroCaption.innerText = "Capturing audio input";
+        sessionState.innerText = "Input active";
+      } else if (state === "Thinking...") {
+        status.classList.add("status-thinking");
+        core.classList.add("busy");
+        wave.style.display = "flex";
+        heroCaption.innerText = "Processing intent";
+        sessionState.innerText = "Inference";
+      } else if (state === "Speaking...") {
+        status.classList.add("status-speaking");
+        core.classList.add("busy");
+        heroCaption.innerText = "Delivering response";
+        sessionState.innerText = "Output active";
+      } else if (state === "Error") {
+        status.classList.add("status-error");
+        heroCaption.innerText = "Attention required";
+        sessionState.innerText = "Fault";
+      }
+
+      status.innerText = state;
+      statusSub.innerText = subtext || "";
+    }
+
+    function appendTelemetry(text) {
+      const el = document.getElementById("telemetry");
+      const stamp = new Date().toLocaleTimeString();
+      el.innerText = `[${stamp}] ${text}\n` + el.innerText;
+    }
+
+    function updateClocks() {
+      const now = new Date().toLocaleTimeString();
+      document.getElementById("clockTop").innerText = now;
+      document.getElementById("clockBottom").innerText = now;
+    }
+
+    async function listen() {
+      const t0 = performance.now();
+
+      setStatus("Listening...", "Recording request");
+      document.getElementById("heard").innerText = "Listening for speech…";
+      document.getElementById("response").innerText = "";
+      document.getElementById("lastAction").innerText = "Voice request";
+      document.getElementById("inputMode").innerText = "Voice";
+      appendTelemetry("Voice capture started.");
+
+      try {
+        const r = await fetch("/listen");
+        setStatus("Thinking...", "Transcribing and generating response");
+
+        const data = await r.json();
+
+        if (data.ok) {
+          requestCount += 1;
+          document.getElementById("requestCount").innerText = requestCount;
+          document.getElementById("heard").innerText = data.text || "(No transcript)";
+          document.getElementById("response").innerText = data.response || "(No response)";
+          setStatus("Speaking...", "Response ready");
+          appendTelemetry("Voice response generated.");
+
+          setTimeout(() => {
+            setStatus("Idle", "Touch the core to speak");
+          }, 900);
+        } else {
+          document.getElementById("response").innerText = data.error || "Unknown error";
+          document.getElementById("heard").innerText = "Input unavailable.";
+          setStatus("Error", data.error || "Voice request failed");
+          document.getElementById("micStatus").innerText = "Check input";
+          document.getElementById("footerMic").innerText = "Issue";
+          appendTelemetry(`Error: ${data.error || "Unknown error"}`);
+        }
+      } catch (err) {
+        document.getElementById("response").innerText = String(err);
+        setStatus("Error", "Network or server problem");
+        document.getElementById("netStatus").innerText = "Error";
+        document.getElementById("footerNet").innerText = "Error";
+        appendTelemetry(`Fetch failed: ${err}`);
+      } finally {
+        const latency = ((performance.now() - t0) / 1000).toFixed(1) + "s";
+        document.getElementById("latencyValue").innerText = latency;
+      }
+    }
+
+    async function askText() {
+      const text = document.getElementById("textInput").value.trim();
+      if (!text) return;
+
+      const t0 = performance.now();
+
+      setStatus("Thinking...", "Processing typed request");
+      document.getElementById("heard").innerText = text;
+      document.getElementById("response").innerText = "";
+      document.getElementById("lastAction").innerText = "Text request";
+      document.getElementById("inputMode").innerText = "Text";
+      appendTelemetry("Typed request submitted.");
+
+      try {
+        const formData = new FormData();
+        formData.append("text", text);
+
+        const r = await fetch("/ask", {
+          method: "POST",
+          body: formData
+        });
+
+        const data = await r.json();
+
+        if (data.ok) {
+          requestCount += 1;
+          document.getElementById("requestCount").innerText = requestCount;
+          document.getElementById("response").innerText = data.response || "(No response)";
+          document.getElementById("textInput").value = "";
+          setStatus("Idle", "Touch the core to speak");
+          appendTelemetry("Typed response generated.");
+        } else {
+          document.getElementById("response").innerText = data.error || "Unknown error";
+          setStatus("Error", data.error || "Typed request failed");
+          appendTelemetry(`Error: ${data.error || "Unknown error"}`);
+        }
+      } catch (err) {
+        document.getElementById("response").innerText = String(err);
+        setStatus("Error", "Network or server problem");
+        appendTelemetry(`Fetch failed: ${err}`);
+      } finally {
+        const latency = ((performance.now() - t0) / 1000).toFixed(1) + "s";
+        document.getElementById("latencyValue").innerText = latency;
+      }
+    }
+
+    document.getElementById("textInput").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        askText();
+      }
+    });
+
+    updateClocks();
+    setInterval(updateClocks, 1000);
+
+    // Placeholder diagnostics for now
+    setInterval(() => {
+      document.getElementById("cpuVal").innerText = (18 + Math.floor(Math.random() * 18)) + "%";
+      document.getElementById("tempVal").innerText = (45 + Math.floor(Math.random() * 8)) + "°C";
+    }, 3000);
+  </script>
+</body>
+</html>
