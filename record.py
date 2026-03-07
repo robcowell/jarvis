@@ -1,7 +1,49 @@
+import os
 import sounddevice as sd
 import numpy as np
 from scipy.io.wavfile import write
 from collections import deque
+
+
+def _env_float(name, fallback, minimum=None):
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        value = float(fallback)
+    else:
+        try:
+            value = float(raw)
+        except ValueError:
+            value = float(fallback)
+
+    if minimum is not None and value < minimum:
+        return float(minimum)
+    return value
+
+
+def _env_int(name, fallback, minimum=None):
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        value = int(fallback)
+    else:
+        try:
+            value = int(raw)
+        except ValueError:
+            value = int(fallback)
+
+    if minimum is not None and value < minimum:
+        return int(minimum)
+    return value
+
+
+# Speech endpoint defaults (overridable via environment variables).
+DEFAULT_MAX_DURATION = _env_float("VOICE_MAX_DURATION", 6.0, minimum=0.5)
+DEFAULT_SAMPLE_RATE = _env_int("VOICE_SAMPLE_RATE", 16000, minimum=8000)
+DEFAULT_CHUNK_SIZE = _env_int("VOICE_CHUNK_SIZE", 1024, minimum=128)
+DEFAULT_SPEECH_THRESHOLD = _env_float("VOICE_SPEECH_THRESHOLD", 0.012, minimum=0.001)
+DEFAULT_SILENCE_DURATION = _env_float("VOICE_SILENCE_DURATION", 0.75, minimum=0.1)
+DEFAULT_MIN_SPEECH_DURATION = _env_float("VOICE_MIN_SPEECH_DURATION", 0.35, minimum=0.1)
+DEFAULT_NO_SPEECH_TIMEOUT = _env_float("VOICE_NO_SPEECH_TIMEOUT", 2.0, minimum=0.2)
+DEFAULT_PRE_ROLL_CHUNKS = _env_int("VOICE_PRE_ROLL_CHUNKS", 2, minimum=1)
 
 
 def get_input_devices():
@@ -21,14 +63,14 @@ def has_input_device():
 
 def record_audio(
     filename="input.wav",
-    max_duration=6.0,
-    fs=16000,
+    max_duration=DEFAULT_MAX_DURATION,
+    fs=DEFAULT_SAMPLE_RATE,
     device=None,
-    chunk_size=1024,
-    speech_threshold=0.012,
-    silence_duration=0.75,
-    min_speech_duration=0.35,
-    no_speech_timeout=2.0,
+    chunk_size=DEFAULT_CHUNK_SIZE,
+    speech_threshold=DEFAULT_SPEECH_THRESHOLD,
+    silence_duration=DEFAULT_SILENCE_DURATION,
+    min_speech_duration=DEFAULT_MIN_SPEECH_DURATION,
+    no_speech_timeout=DEFAULT_NO_SPEECH_TIMEOUT,
 ):
     input_devices = get_input_devices()
 
@@ -44,7 +86,7 @@ def record_audio(
     silence_chunks_to_stop = max(1, int(silence_duration * fs / chunk_size))
     min_speech_chunks = max(1, int(min_speech_duration * fs / chunk_size))
     no_speech_chunks = max(1, int(no_speech_timeout * fs / chunk_size))
-    pre_roll = deque(maxlen=2)
+    pre_roll = deque(maxlen=DEFAULT_PRE_ROLL_CHUNKS)
 
     speech_started = False
     captured_chunks = []
