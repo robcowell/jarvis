@@ -173,6 +173,13 @@ function handleServerEvent(event) {
 
   if (event.type === "voice_result") {
     handleVoiceResult(event.payload || {});
+    return;
+  }
+
+  if (event.type === "core_status") {
+    const stage = event.payload.stage || "unknown";
+    const message = event.payload.error || "core unavailable";
+    appendTelemetry(`Core ${stage} issue: ${message}. Using local fallback.`);
   }
 }
 

@@ -1,4 +1,4 @@
-from console.app import app, main
+from console.app import main
 
 
 if __name__ == "__main__":

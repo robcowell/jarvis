@@ -1,20 +1,43 @@
-# J.A.R.V.I.S. Raspberry Pi Voice Assistant
+# J.A.R.V.I.S. Distributed Voice Assistant (Phase 1)
 
-Flask-based touchscreen voice assistant designed for Raspberry Pi kiosk use (800x480), with:
+This repository started as a single Raspberry Pi Flask app. It is now being refactored into a distributed architecture:
+
+- `Console` (Raspberry Pi): UI + audio I/O + wake word
+- `Core` (Windows PC): API server + AI workloads
+
+Current implementation still supports local fallback for resilience.
+
+## Current capabilities
+
+Console-side:
 
 - Touch-friendly sci-fi web UI (Chromium kiosk)
 - Microphone recording with speech endpoint detection (stops on silence)
-- Speech transcription via OpenAI
-- LLM response generation via OpenAI
-- Spoken output via Piper TTS (with optional eSpeak fallback)
+- Wake-word listener (Porcupine)
+- Speaker playback
+
+Core-side (new):
+
+- FastAPI server
+- Speech transcription via OpenAI (`/transcribe`)
+- LLM response generation via OpenAI (`/command`)
+- TTS generation as WAV (`/tts`)
 
 ## Project Structure
 
-- `app.py` - Flask app and routes (`/`, `/listen`, `/ask`)
-- `record.py` - Audio capture and speech-endpoint logic
-- `transcribe.py` - Speech-to-text call
-- `brain.py` - Prompting + response generation
-- `speak.py` - Piper/eSpeak text-to-speech
+Console modules now live under `console/` with root-level compatibility shims still present.
+
+- `console/app.py` - Flask app and routes (`/`, `/listen`, `/ask`)
+- `console/record.py` - Audio capture and speech-endpoint logic
+- `console/wake_listener.py` - Always-listening wake detection (Porcupine)
+- `console/wakeword.py` - Wake-word transcript parsing/gating
+- `console/speak.py` - Playback and fallback local TTS path
+- `console/core_client.py` - Console HTTP client for Core endpoints
+- `core/server.py` - FastAPI Core API server
+- `core/services.py` - Core AI service implementations
+- `shared/schemas.py` - Shared API request/response models
+- `docs/distributed-architecture.md` - Refactor notes
+- `app.py`, `record.py`, `wake_listener.py`, `wakeword.py`, `speak.py` - compatibility shims
 - `templates/index.html` - Main UI template
 - `static/css/jarvis.css` - UI styles
 - `static/js/jarvis-ui.js` - UI behavior
@@ -41,13 +64,31 @@ pip install -r requirements.txt
 
 ## Run
 
+### 1) Start Core (Windows PC)
+
+From project root:
+
+```bash
+uvicorn core.server:app --host 0.0.0.0 --port 8000
+```
+
+### 2) Start Console (Raspberry Pi)
+
 From project root:
 
 ```bash
 python app.py
 ```
 
+Or run the package entrypoint:
+
+```bash
+python -m console
+```
+
 Then open `http://<pi-ip>:5000` (or your local host) in Chromium kiosk mode.
+
+If Core is reachable, the console uses it automatically when `JARVIS_CORE_URL` is set. If not, it falls back to local processing.
 
 ## Environment Variables (Complete Reference)
 
@@ -58,6 +99,28 @@ This section lists all environment variables used for configuration across the p
 - `OPENAI_API_KEY`
   - Used by the OpenAI Python SDK in both `transcribe.py` and `brain.py`.
   - No default.
+
+## Distributed mode (console -> core)
+
+- `JARVIS_CORE_URL`
+  - Example: `http://192.168.1.100:8000`
+  - When set, console routes transcription/command/TTS to Core over HTTP.
+- `JARVIS_DEVICE_ID`
+  - Default: `pi-console`
+  - Included with `/command` requests for device-aware orchestration.
+- `JARVIS_DEVICE_LOCATION`
+  - Default: `unknown`
+  - Included with `/command` requests.
+- `JARVIS_CORE_TIMEOUT_SECONDS`
+  - Default: `20`
+  - Request timeout for Core API calls.
+
+Core-specific optional model overrides:
+
+- `JARVIS_COMMAND_MODEL` (default: `gpt-4.1-mini`)
+- `JARVIS_TRANSCRIBE_MODEL` (default: `gpt-4o-mini-transcribe`)
+- `JARVIS_TTS_MODEL` (default: `gpt-4o-mini-tts`)
+- `JARVIS_TTS_VOICE` (default: `alloy`)
 
 ## OpenAI (optional SDK-level)
 

@@ -3,3 +3,7 @@ openai
 numpy
 pvporcupine
 pvrecorder
+requests
+fastapi
+uvicorn
+python-multipart

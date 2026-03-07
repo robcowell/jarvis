@@ -1,0 +1,287 @@
+from collections import deque
+import os
+from pathlib import Path
+import threading
+
+from flask import Flask, render_template, request, jsonify
+from console import core_client
+from console import record
+from console import speak
+from console import wakeword
+from console import wake_listener
+import transcribe
+import brain
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+app = Flask(
+    __name__,
+    template_folder=str(BASE_DIR / "templates"),
+    static_folder=str(BASE_DIR / "static"),
+)
+
+_voice_lock = threading.Lock()
+_event_lock = threading.Lock()
+_event_id = 0
+_events = deque(maxlen=80)
+_wake_service = None
+_wake_status = "Off"
+_console_device_id = os.getenv("JARVIS_DEVICE_ID", "pi-console")
+_console_location = os.getenv("JARVIS_DEVICE_LOCATION", "unknown")
+
+
+def _emit_event(event_type, payload):
+    global _event_id
+    with _event_lock:
+        _event_id += 1
+        _events.append({
+            "id": _event_id,
+            "type": event_type,
+            "payload": payload
+        })
+
+
+def _get_events_since(since_id):
+    with _event_lock:
+        return [event for event in _events if event["id"] > since_id]
+
+
+def _set_wake_status(status, detail=""):
+    global _wake_status
+    _wake_status = status
+    _emit_event("wake_status", {
+        "status": status,
+        "detail": detail
+    })
+
+
+def _voice_pipeline(source="touch", emit_events=False):
+    if not _voice_lock.acquire(blocking=False):
+        return {
+            "ok": False,
+            "busy": True,
+            "error": "Voice pipeline is already running"
+        }
+
+    try:
+        if emit_events:
+            _emit_event("voice_state", {
+                "state": "Listening...",
+                "subtext": "Wake word detected. Recording request",
+                "source": source
+            })
+
+        record.record_audio()
+
+        if emit_events:
+            _emit_event("voice_state", {
+                "state": "Thinking...",
+                "subtext": "Transcribing request",
+                "source": source
+            })
+
+        using_core = core_client.is_enabled()
+        if using_core:
+            try:
+                text = core_client.transcribe_audio_file("input.wav")
+            except core_client.CoreUnavailableError as exc:
+                print(f"Core transcribe failed ({exc}). Falling back to local transcribe.")
+                _emit_event("core_status", {
+                    "ok": False,
+                    "error": str(exc),
+                    "stage": "transcribe"
+                })
+                text = transcribe.transcribe_audio()
+        else:
+            text = transcribe.transcribe_audio()
+        prompt_text = text
+
+        # Skip transcript wake-word gating when wake mode already triggered by Porcupine.
+        should_require_wake_word = wakeword.WAKE_WORD_ENABLED and source != "wake_word"
+        if should_require_wake_word:
+            if not wakeword.contains_wake_word(text):
+                return {
+                    "ok": False,
+                    "wake_word_missing": True,
+                    "text": text,
+                    "error": f'Say "{wakeword.WAKE_WORD_DISPLAY}" to activate.'
+                }
+
+            prompt_text = wakeword.strip_wake_word(text)
+            if not prompt_text:
+                return {
+                    "ok": False,
+                    "wake_word_only": True,
+                    "text": text,
+                    "error": "Wake word heard. Say your command after it."
+                }
+
+        if using_core:
+            try:
+                response = core_client.command(
+                    prompt_text,
+                    device_id=_console_device_id,
+                    location=_console_location
+                )
+            except core_client.CoreUnavailableError as exc:
+                print(f"Core command failed ({exc}). Falling back to local brain.")
+                _emit_event("core_status", {
+                    "ok": False,
+                    "error": str(exc),
+                    "stage": "command"
+                })
+                response = brain.ask_jarvis(prompt_text)
+        else:
+            response = brain.ask_jarvis(prompt_text)
+
+        if emit_events:
+            _emit_event("voice_state", {
+                "state": "Speaking...",
+                "subtext": "Response ready",
+                "source": source
+            })
+
+        if using_core:
+            try:
+                wav = core_client.tts(response)
+                speak.play_wav_bytes(wav)
+            except core_client.CoreUnavailableError as exc:
+                print(f"Core tts failed ({exc}). Falling back to local TTS.")
+                _emit_event("core_status", {
+                    "ok": False,
+                    "error": str(exc),
+                    "stage": "tts"
+                })
+                speak.speak(response)
+        else:
+            speak.speak(response)
+        return {
+            "ok": True,
+            "text": text,
+            "prompt_text": prompt_text,
+            "response": response,
+            "processing": "core" if using_core else "local"
+        }
+    finally:
+        _voice_lock.release()
+
+
+def _start_wake_listener():
+    global _wake_service
+
+    if not wake_listener.WAKE_ALWAYS_LISTEN_ENABLED:
+        _set_wake_status("Off", "Always-listening wake mode disabled")
+        return
+
+    if _wake_service is not None:
+        return
+
+    def on_detect(keyword):
+        try:
+            _emit_event("wake_detected", {
+                "keyword": keyword
+            })
+            result = _voice_pipeline(source="wake_word", emit_events=True)
+            _emit_event("voice_result", {
+                **result,
+                "source": "wake_word"
+            })
+        except Exception as exc:
+            _emit_event("voice_result", {
+                "ok": False,
+                "source": "wake_word",
+                "error": str(exc)
+            })
+
+    def on_error(message):
+        _set_wake_status("Error", message)
+        _emit_event("voice_result", {
+            "ok": False,
+            "source": "wake_word",
+            "error": message
+        })
+
+    _wake_service = wake_listener.PorcupineWakeListener(on_detect=on_detect, on_error=on_error)
+    _wake_service.start()
+    _set_wake_status("Armed", "Listening for wake word")
+
+
+@app.route("/")
+def home():
+    audio_available = record.has_input_device()
+    input_devices = record.get_input_devices()
+    return render_template(
+        "index.html",
+        audio_available=audio_available,
+        input_devices=input_devices
+    )
+
+
+@app.route("/listen")
+def listen():
+    try:
+        return jsonify(_voice_pipeline(source="touch", emit_events=False)), 200
+    except Exception as e:
+        return jsonify({
+            "ok": False,
+            "error": str(e)
+        }), 200
+
+
+@app.route("/events")
+def events():
+    since = request.args.get("since", "0").strip()
+    try:
+        since_id = int(since)
+    except ValueError:
+        since_id = 0
+    return jsonify({
+        "ok": True,
+        "events": _get_events_since(since_id)
+    }), 200
+
+
+@app.route("/ask", methods=["POST"])
+def ask():
+    try:
+        text = request.form.get("text", "").strip()
+
+        if not text:
+            return jsonify({
+                "ok": False,
+                "error": "No text provided"
+            })
+
+        if core_client.is_enabled():
+            try:
+                response = core_client.command(
+                    text,
+                    device_id=_console_device_id,
+                    location=_console_location
+                )
+            except core_client.CoreUnavailableError as exc:
+                print(f"Core command failed ({exc}). Falling back to local brain.")
+                response = brain.ask_jarvis(text)
+        else:
+            response = brain.ask_jarvis(text)
+
+        return jsonify({
+            "ok": True,
+            "text": text,
+            "response": response
+        })
+    except Exception as e:
+        return jsonify({
+            "ok": False,
+            "error": str(e)
+        }), 200
+
+
+def main() -> None:
+    debug_mode = True
+    if (not debug_mode) or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        _start_wake_listener()
+    app.run(host="0.0.0.0", port=5000, debug=debug_mode)
+
+
+if __name__ == "__main__":
+    main()
