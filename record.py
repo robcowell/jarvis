@@ -37,7 +37,7 @@ def _env_int(name, fallback, minimum=None):
 
 # Speech endpoint defaults (overridable via environment variables).
 DEFAULT_MAX_DURATION = _env_float("VOICE_MAX_DURATION", 6.0, minimum=0.5)
-DEFAULT_SAMPLE_RATE = _env_int("VOICE_SAMPLE_RATE", 16000, minimum=8000)
+DEFAULT_SAMPLE_RATE = _env_int("VOICE_SAMPLE_RATE", 48000, minimum=8000)
 DEFAULT_CHUNK_SIZE = _env_int("VOICE_CHUNK_SIZE", 1024, minimum=128)
 DEFAULT_SPEECH_THRESHOLD = _env_float("VOICE_SPEECH_THRESHOLD", 0.012, minimum=0.001)
 DEFAULT_SILENCE_DURATION = _env_float("VOICE_SILENCE_DURATION", 0.75, minimum=0.1)
