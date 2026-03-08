@@ -13,7 +13,7 @@ _client: OpenAI | None = None
 _CHAT_MODEL = os.getenv("JARVIS_COMMAND_MODEL", "gpt-5")
 _TRANSCRIBE_MODEL = os.getenv("JARVIS_TRANSCRIBE_MODEL", "gpt-4o-mini-transcribe")
 _TTS_MODEL = os.getenv("JARVIS_TTS_MODEL", "gpt-4o-mini-tts")
-_TTS_VOICE = os.getenv("JARVIS_TTS_VOICE", "onyx")
+_TTS_VOICE = os.getenv("JARVIS_TTS_VOICE", "ballad")
 _TTS_INSTRUCTIONS = os.getenv(
     "JARVIS_TTS_INSTRUCTIONS",
     "Speak in clear British English with a consistent, natural assistant tone.",
