@@ -117,6 +117,9 @@ This section lists all environment variables used for configuration across the p
 - `JARVIS_CORE_TIMEOUT_SECONDS`
   - Default: `20`
   - Request timeout for Core API calls.
+- `JARVIS_CORE_TTS_TIMEOUT_SECONDS`
+  - Default: same as `JARVIS_CORE_TIMEOUT_SECONDS`
+  - Optional dedicated timeout for `POST /tts` so speech latency can be tuned independently.
 - `JARVIS_TTS_MODE`
   - Default: `core_only`
   - `core_only` = normal mode. Use Core `/tts` only, then play returned WAV bytes.

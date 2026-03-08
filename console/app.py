@@ -184,7 +184,7 @@ def _voice_pipeline(source="touch", emit_events=False):
                     "error": str(exc),
                     "stage": "tts"
                 })
-                _log_tts("core", mode=_tts_mode, error="unavailable")
+                _log_tts("core", mode=_tts_mode, error="unavailable", fallback_used="none")
                 return {
                     "ok": False,
                     "text": text,

@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import time
 
 import requests
 
@@ -20,6 +21,7 @@ def _env_float(name: str, fallback: float) -> float:
 
 JARVIS_CORE_URL = (os.getenv("JARVIS_CORE_URL") or "").strip().rstrip("/")
 JARVIS_CORE_TIMEOUT_SECONDS = _env_float("JARVIS_CORE_TIMEOUT_SECONDS", 20.0)
+JARVIS_CORE_TTS_TIMEOUT_SECONDS = _env_float("JARVIS_CORE_TTS_TIMEOUT_SECONDS", JARVIS_CORE_TIMEOUT_SECONDS)
 
 
 def is_enabled() -> bool:
@@ -76,18 +78,42 @@ def command(text: str, device_id: str, location: str) -> str:
 
 
 def tts(text: str) -> bytes:
+    started_at = time.monotonic()
+    text_len = len((text or "").strip())
+    timeout_seconds = JARVIS_CORE_TTS_TIMEOUT_SECONDS
+    print(
+        f"[TTS] path=core stage=request-start endpoint=/tts "
+        f"request_chars={text_len} timeout_seconds={timeout_seconds}"
+    )
     try:
-        print(f"[TTS] path=core request_chars={len((text or '').strip())}")
         response = requests.post(
             _url("/tts"),
             json={"text": text},
-            timeout=JARVIS_CORE_TIMEOUT_SECONDS,
+            timeout=timeout_seconds,
         )
         response.raise_for_status()
         audio = response.content
         if not audio:
             raise CoreUnavailableError("Core /tts returned empty audio")
-        print(f"[TTS] path=core response_bytes={len(audio)}")
+        elapsed_ms = int((time.monotonic() - started_at) * 1000)
+        print(
+            f"[TTS] path=core stage=request-success endpoint=/tts "
+            f"response_bytes={len(audio)} duration_ms={elapsed_ms}"
+        )
         return audio
+    except requests.Timeout as exc:
+        elapsed_ms = int((time.monotonic() - started_at) * 1000)
+        print(
+            f"[TTS] path=core stage=request-failed endpoint=/tts reason=timeout "
+            f"timeout_seconds={timeout_seconds} duration_ms={elapsed_ms}"
+        )
+        raise CoreUnavailableError(
+            f"Core /tts timed out after {timeout_seconds}s ({elapsed_ms}ms elapsed): {exc}"
+        ) from exc
     except requests.RequestException as exc:
+        elapsed_ms = int((time.monotonic() - started_at) * 1000)
+        print(
+            f"[TTS] path=core stage=request-failed endpoint=/tts reason=request_error "
+            f"duration_ms={elapsed_ms} detail={exc}"
+        )
         raise CoreUnavailableError(f"Core /tts unreachable: {exc}") from exc
