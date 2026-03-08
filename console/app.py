@@ -66,12 +66,24 @@ def _is_local_interrupt_command(text: str) -> bool:
     normalized = _normalize_phrase(text)
     if not normalized:
         return False
-    if normalized in _LOCAL_INTERRUPT_PHRASES:
-        return True
-    if normalized.startswith("stop ") or normalized.startswith("cancel "):
-        return True
-    if normalized.startswith("thats enough "):
-        return True
+
+    candidates = {normalized}
+    # Accept phrases like "jarvis stop" in wake-listener transcripts.
+    for word in wakeword.WAKE_WORDS:
+        wake_normalized = _normalize_phrase(word)
+        if not wake_normalized:
+            continue
+        prefix = f"{wake_normalized} "
+        if normalized.startswith(prefix):
+            candidates.add(normalized[len(prefix):].strip())
+
+    for phrase in list(candidates):
+        if phrase in _LOCAL_INTERRUPT_PHRASES:
+            return True
+        if phrase.startswith("stop ") or phrase.startswith("cancel "):
+            return True
+        if phrase.startswith("thats enough "):
+            return True
     return False
 
 
@@ -101,6 +113,23 @@ def _set_wake_status(status, detail=""):
 
 
 def _voice_pipeline(source="touch", emit_events=False):
+    if source == "wake_word" and speak.is_speaking():
+        print("[SpeechInterrupt] wake-word-shortcut-triggered while speaking")
+        stop_stats = speak.stop_speech()
+        if emit_events:
+            _emit_event("voice_state", {
+                "state": "Idle",
+                "subtext": "Speech interrupted",
+                "source": source,
+            })
+        return {
+            "ok": True,
+            "response": "Stopping speech.",
+            "processing": "local-interrupt",
+            "interrupted": True,
+            "stop": stop_stats,
+        }
+
     if not _voice_lock.acquire(blocking=False):
         return {
             "ok": False,
