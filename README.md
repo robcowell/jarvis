@@ -131,7 +131,7 @@ Core-specific optional model overrides:
 - `JARVIS_COMMAND_MODEL` (default: `gpt-5.3`)
 - `JARVIS_TRANSCRIBE_MODEL` (default: `gpt-4o-mini-transcribe`)
 - `JARVIS_TTS_MODEL` (default: `gpt-4o-mini-tts`)
-- `JARVIS_TTS_VOICE` (default: `alloy`)
+- `JARVIS_TTS_VOICE` (default: `onyx`)
 - `JARVIS_TTS_INSTRUCTIONS` (default: `Speak in clear British English with a consistent, natural assistant tone.`)
 - `JARVIS_SKILLS_DIR` (default: `<repo>/skills`)
   - Location of local installed skills loaded by Core at startup.
