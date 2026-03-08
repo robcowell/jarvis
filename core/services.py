@@ -96,6 +96,7 @@ def transcribe_file_bytes(filename: str, audio_bytes: bytes) -> str:
 
 def tts_wav_bytes(text: str) -> bytes:
     client = _get_client()
+    print(f"[TTS] path=core model={_TTS_MODEL} voice={_TTS_VOICE} chars={len((text or '').strip())}")
     # OpenAI Python SDK has minor signature differences across versions.
     create_kwargs = {
         "model": _TTS_MODEL,
@@ -124,9 +125,15 @@ def tts_wav_bytes(text: str) -> bytes:
             result = client.audio.speech.create(**legacy_kwargs)
 
     if hasattr(result, "read"):
-        return result.read()
+        wav = result.read()
+        print(f"[TTS] path=core rendered_bytes={len(wav)}")
+        return wav
     if hasattr(result, "content"):
-        return result.content
+        wav = result.content
+        print(f"[TTS] path=core rendered_bytes={len(wav)}")
+        return wav
     if isinstance(result, (bytes, bytearray)):
-        return bytes(result)
+        wav = bytes(result)
+        print(f"[TTS] path=core rendered_bytes={len(wav)}")
+        return wav
     raise RuntimeError("Unsupported TTS response object from OpenAI SDK")

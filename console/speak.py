@@ -10,7 +10,7 @@ PIPER_MODEL_PATH = os.getenv("PIPER_MODEL_PATH", "/home/robcowell/piper/voices/e
 PIPER_SAMPLE_RATE = int(os.getenv("PIPER_SAMPLE_RATE", "22050"))
 APLAY_PATH = os.getenv("APLAY_PATH", "aplay").strip()
 ESPEAK_PATH = os.getenv("ESPEAK_PATH", "espeak").strip()
-TTS_FALLBACK_TO_ESPEAK = os.getenv("TTS_FALLBACK_TO_ESPEAK", "1").strip().lower() not in {"0", "false", "no"}
+TTS_FALLBACK_TO_ESPEAK = os.getenv("TTS_FALLBACK_TO_ESPEAK", "0").strip().lower() not in {"0", "false", "no"}
 
 
 def _expand_path(path: str) -> str:
@@ -28,6 +28,8 @@ def _run_piper(text: str) -> None:
     piper_path = _expand_path(PIPER_PATH)
     model_path = _expand_path(PIPER_MODEL_PATH)
 
+    if piper_path and Path(piper_path).is_dir():
+        raise RuntimeError(f"PIPER_PATH must point to executable, not directory: {piper_path}")
     if not _command_exists(piper_path):
         raise RuntimeError(f"Piper executable not found: {piper_path}")
     if not model_path:
@@ -105,6 +107,7 @@ def play_wav_file(path: str) -> None:
 def play_wav_bytes(audio: bytes) -> None:
     if not audio:
         raise RuntimeError("No audio bytes provided")
+    print(f"[TTS] playback=wav-bytes bytes={len(audio)}")
     temp_file = None
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
@@ -120,18 +123,20 @@ def play_wav_bytes(audio: bytes) -> None:
                 pass
 
 
-def speak(text):
+def speak(text, allow_espeak_fallback=None):
     message = (text or "").strip()
     if not message:
         return
 
+    fallback_enabled = TTS_FALLBACK_TO_ESPEAK if allow_espeak_fallback is None else bool(allow_espeak_fallback)
+    print(f"[TTS] path=local-piper chars={len(message)} fallback_espeak={int(fallback_enabled)}")
     print(f"Jarvis says: {message}")
 
     try:
         _run_piper(message)
     except Exception as exc:
-        if not TTS_FALLBACK_TO_ESPEAK:
+        if not fallback_enabled:
             raise RuntimeError(f"Piper TTS failed: {exc}") from exc
 
-        print(f"Piper TTS failed ({exc}). Falling back to eSpeak.")
+        print(f"[TTS] fallback=espeak reason=piper_error detail={exc}")
         _run_espeak(message)

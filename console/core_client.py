@@ -77,6 +77,7 @@ def command(text: str, device_id: str, location: str) -> str:
 
 def tts(text: str) -> bytes:
     try:
+        print(f"[TTS] path=core request_chars={len((text or '').strip())}")
         response = requests.post(
             _url("/tts"),
             json={"text": text},
@@ -86,6 +87,7 @@ def tts(text: str) -> bytes:
         audio = response.content
         if not audio:
             raise CoreUnavailableError("Core /tts returned empty audio")
+        print(f"[TTS] path=core response_bytes={len(audio)}")
         return audio
     except requests.RequestException as exc:
         raise CoreUnavailableError(f"Core /tts unreachable: {exc}") from exc

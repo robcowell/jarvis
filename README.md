@@ -118,10 +118,10 @@ This section lists all environment variables used for configuration across the p
   - Default: `20`
   - Request timeout for Core API calls.
 - `JARVIS_TTS_MODE`
-  - Default: `auto_fallback`
-  - `auto_fallback` = try Core TTS then fallback local.
-  - `core_only` = use Core TTS only (no local TTS fallback).
-  - `local_only` = use Pi local TTS only (no Core TTS).
+  - Default: `core_only`
+  - `core_only` = normal mode. Use Core `/tts` only, then play returned WAV bytes.
+  - `local_only` = explicit offline/debug mode. Use Pi local TTS only.
+  - `auto_fallback` is deprecated and treated as `core_only`.
 
 Core-specific optional model overrides:
 
@@ -158,8 +158,8 @@ If unset, the SDK uses its built-in defaults.
   - Default: `aplay`
   - Playback command path/name
 - `TTS_FALLBACK_TO_ESPEAK`
-  - Default: `1`
-  - If Piper fails, fallback to eSpeak (`1`, `true`, `yes` enable; `0`, `false`, `no` disable)
+  - Default: `0`
+  - If Piper fails in local mode, fallback to eSpeak (`1`, `true`, `yes` enable; `0`, `false`, `no` disable)
 - `ESPEAK_PATH`
   - Default: `espeak`
   - eSpeak command path/name used only when fallback is enabled

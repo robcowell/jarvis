@@ -31,13 +31,23 @@ _console_location = os.getenv("JARVIS_DEVICE_LOCATION", "unknown")
 
 def _parse_tts_mode(value: str) -> str:
     normalized = (value or "").strip().lower()
-    allowed = {"auto_fallback", "core_only", "local_only"}
-    if normalized in allowed:
+    if normalized == "auto_fallback":
+        print("[TTS] mode=auto_fallback is deprecated; forcing mode=core_only")
+        return "core_only"
+    if normalized in {"core_only", "local_only"}:
         return normalized
-    return "auto_fallback"
+    return "core_only"
 
 
-_tts_mode = _parse_tts_mode(os.getenv("JARVIS_TTS_MODE", "auto_fallback"))
+_tts_mode = _parse_tts_mode(os.getenv("JARVIS_TTS_MODE", "core_only"))
+
+
+def _log_tts(path: str, **details) -> None:
+    suffix = " ".join(f"{key}={value}" for key, value in details.items())
+    if suffix:
+        print(f"[TTS] path={path} {suffix}")
+        return
+    print(f"[TTS] path={path}")
 
 
 def _emit_event(event_type, payload):
@@ -152,9 +162,11 @@ def _voice_pipeline(source="touch", emit_events=False):
             })
 
         if _tts_mode == "local_only":
+            _log_tts("local-piper", mode=_tts_mode, chars=len(response))
             speak.speak(response)
-        elif _tts_mode == "core_only":
+        else:
             if not using_core:
+                _log_tts("none", mode=_tts_mode, error="core_not_configured")
                 return {
                     "ok": False,
                     "text": text,
@@ -163,6 +175,7 @@ def _voice_pipeline(source="touch", emit_events=False):
                     "error": "JARVIS_TTS_MODE=core_only but JARVIS_CORE_URL is not configured"
                 }
             try:
+                _log_tts("core", mode=_tts_mode, chars=len(response))
                 wav = core_client.tts(response)
                 speak.play_wav_bytes(wav)
             except core_client.CoreUnavailableError as exc:
@@ -171,6 +184,7 @@ def _voice_pipeline(source="touch", emit_events=False):
                     "error": str(exc),
                     "stage": "tts"
                 })
+                _log_tts("core", mode=_tts_mode, error="unavailable")
                 return {
                     "ok": False,
                     "text": text,
@@ -178,20 +192,6 @@ def _voice_pipeline(source="touch", emit_events=False):
                     "response": response,
                     "error": f"Core TTS unavailable in core_only mode: {exc}"
                 }
-        elif using_core:
-            try:
-                wav = core_client.tts(response)
-                speak.play_wav_bytes(wav)
-            except core_client.CoreUnavailableError as exc:
-                print(f"Core tts failed ({exc}). Falling back to local TTS.")
-                _emit_event("core_status", {
-                    "ok": False,
-                    "error": str(exc),
-                    "stage": "tts"
-                })
-                speak.speak(response)
-        else:
-            speak.speak(response)
         return {
             "ok": True,
             "text": text,
