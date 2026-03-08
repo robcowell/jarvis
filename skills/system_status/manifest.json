@@ -1,0 +1,13 @@
+{
+  "id": "system_status",
+  "name": "System Status Skill",
+  "description": "Reports a compact runtime status for diagnostics.",
+  "entry_class": "SystemStatusSkill",
+  "trigger_phrases": [
+    "system status",
+    "jarvis status",
+    "status report"
+  ],
+  "priority": 50,
+  "enabled": true
+}

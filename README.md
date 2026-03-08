@@ -22,6 +22,7 @@ Core-side (new):
 - Speech transcription via OpenAI (`/transcribe`)
 - LLM response generation via OpenAI (`/command`)
 - TTS generation as WAV (`/tts`)
+- Skills diagnostics (`/skills`)
 
 ## Project Structure
 
@@ -35,6 +36,8 @@ Console modules now live under `console/` with root-level compatibility shims st
 - `console/core_client.py` - Console HTTP client for Core endpoints
 - `core/server.py` - FastAPI Core API server
 - `core/services.py` - Core AI service implementations
+- `core/skills/` - Skill framework (manifest parsing, registry, router, result schema)
+- `skills/<skill_name>/manifest.json` + `skills/<skill_name>/skill.py` - Installed local skills
 - `shared/schemas.py` - Shared API request/response models
 - `docs/distributed-architecture.md` - Refactor notes
 - `app.py`, `record.py`, `wake_listener.py`, `wakeword.py`, `speak.py` - compatibility shims
@@ -127,6 +130,8 @@ Core-specific optional model overrides:
 - `JARVIS_TTS_MODEL` (default: `gpt-4o-mini-tts`)
 - `JARVIS_TTS_VOICE` (default: `alloy`)
 - `JARVIS_TTS_INSTRUCTIONS` (default: `Speak in clear British English with a consistent, natural assistant tone.`)
+- `JARVIS_SKILLS_DIR` (default: `<repo>/skills`)
+  - Location of local installed skills loaded by Core at startup.
 
 ## OpenAI (optional SDK-level)
 

@@ -6,6 +6,8 @@ from shared.schemas import (
     CommandRequest,
     CommandResponse,
     HealthResponse,
+    SkillInfo,
+    SkillsResponse,
     TranscribeResponse,
     TtsRequest,
 )
@@ -29,11 +31,21 @@ async def transcribe(file: UploadFile = File(...)) -> TranscribeResponse:
 
 @app.post("/command", response_model=CommandResponse)
 def command(body: CommandRequest) -> CommandResponse:
-    response = services.command(body.text, body.device_id, body.location)
-    return CommandResponse(response=response)
+    payload = services.command(body.text, body.device_id, body.location)
+    return CommandResponse(**payload)
 
 
 @app.post("/tts")
 def tts(body: TtsRequest) -> Response:
     wav = services.tts_wav_bytes(body.text)
     return Response(content=wav, media_type="audio/wav")
+
+
+@app.get("/skills", response_model=SkillsResponse)
+def skills() -> SkillsResponse:
+    records = services.list_skills()
+    return SkillsResponse(
+        ok=True,
+        count=len(records),
+        skills=[SkillInfo(**record) for record in records],
+    )

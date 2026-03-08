@@ -1,0 +1,13 @@
+{
+  "id": "hello",
+  "name": "Hello Skill",
+  "description": "Returns a deterministic greeting and runtime context.",
+  "entry_class": "HelloSkill",
+  "trigger_phrases": [
+    "hello jarvis",
+    "say hello",
+    "hello"
+  ],
+  "priority": 100,
+  "enabled": true
+}
