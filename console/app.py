@@ -1,6 +1,7 @@
 from collections import deque
 import os
 from pathlib import Path
+import re
 import threading
 
 from flask import Flask, render_template, request, jsonify
@@ -40,6 +41,11 @@ def _parse_tts_mode(value: str) -> str:
 
 
 _tts_mode = _parse_tts_mode(os.getenv("JARVIS_TTS_MODE", "core_only"))
+_LOCAL_INTERRUPT_PHRASES = {
+    "stop",
+    "cancel",
+    "thats enough",
+}
 
 
 def _log_tts(path: str, **details) -> None:
@@ -48,6 +54,25 @@ def _log_tts(path: str, **details) -> None:
         print(f"[TTS] path={path} {suffix}")
         return
     print(f"[TTS] path={path}")
+
+
+def _normalize_phrase(text: str) -> str:
+    lowered = (text or "").strip().lower().replace("'", "")
+    cleaned = re.sub(r"[^a-z0-9\s]", " ", lowered)
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def _is_local_interrupt_command(text: str) -> bool:
+    normalized = _normalize_phrase(text)
+    if not normalized:
+        return False
+    if normalized in _LOCAL_INTERRUPT_PHRASES:
+        return True
+    if normalized.startswith("stop ") or normalized.startswith("cancel "):
+        return True
+    if normalized.startswith("thats enough "):
+        return True
+    return False
 
 
 def _emit_event(event_type, payload):
@@ -135,6 +160,25 @@ def _voice_pipeline(source="touch", emit_events=False):
                     "text": text,
                     "error": "Wake word heard. Say your command after it."
                 }
+
+        if _is_local_interrupt_command(prompt_text):
+            print(f"[SpeechInterrupt] local-stop-triggered source={source} text='{prompt_text}'")
+            stop_stats = speak.stop_speech()
+            if emit_events:
+                _emit_event("voice_state", {
+                    "state": "Idle",
+                    "subtext": "Speech interrupted",
+                    "source": source,
+                })
+            return {
+                "ok": True,
+                "text": text,
+                "prompt_text": prompt_text,
+                "response": "Stopping speech.",
+                "processing": "local-interrupt",
+                "interrupted": True,
+                "stop": stop_stats,
+            }
 
         if using_core:
             try:

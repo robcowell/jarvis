@@ -2,7 +2,10 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
+
+from console.speech_manager import SpeechInterrupted, get_speech_manager
 
 # TTS runtime configuration (override with environment variables on the Pi).
 PIPER_PATH = os.getenv("PIPER_PATH", "/home/robcowell/piper/build/piper").strip()
@@ -24,7 +27,21 @@ def _command_exists(command: str) -> bool:
     return Path(expanded).is_file() or shutil.which(expanded) is not None or shutil.which(command) is not None
 
 
-def _run_piper(text: str) -> None:
+def _wait_process_interruptible(
+    proc: subprocess.Popen,
+    generation: int,
+    manager,
+    poll_interval_seconds: float = 0.02,
+) -> int:
+    while True:
+        manager.assert_not_interrupted(generation)
+        code = proc.poll()
+        if code is not None:
+            return code
+        time.sleep(poll_interval_seconds)
+
+
+def _run_piper(text: str, generation: int, manager) -> None:
     piper_path = _expand_path(PIPER_PATH)
     model_path = _expand_path(PIPER_MODEL_PATH)
 
@@ -55,22 +72,41 @@ def _run_piper(text: str) -> None:
         stderr=subprocess.PIPE
     )
 
+    manager.register_process(piper_process, generation)
+    manager.register_process(aplay_process, generation)
+
     # Allow piper stdout to receive SIGPIPE if aplay exits unexpectedly.
     if piper_process.stdout is not None:
         piper_process.stdout.close()
 
-    _, piper_stderr = piper_process.communicate(input=f"{text}\n".encode("utf-8"))
+    piper_stderr = b""
     aplay_stderr = b""
-    if aplay_process.stderr is not None:
-        aplay_stderr = aplay_process.stderr.read()
-    aplay_return_code = aplay_process.wait()
+    try:
+        if piper_process.stdin is not None:
+            piper_process.stdin.write(f"{text}\n".encode("utf-8"))
+            piper_process.stdin.close()
 
-    if piper_process.returncode != 0:
-        err = piper_stderr.decode("utf-8", errors="replace").strip()
-        raise RuntimeError(f"Piper failed with code {piper_process.returncode}: {err}")
-    if aplay_return_code != 0:
-        err = aplay_stderr.decode("utf-8", errors="replace").strip()
-        raise RuntimeError(f"Audio playback failed with code {aplay_return_code}: {err}")
+        piper_return_code = _wait_process_interruptible(piper_process, generation, manager)
+        aplay_return_code = _wait_process_interruptible(aplay_process, generation, manager)
+
+        if piper_process.stderr is not None:
+            piper_stderr = piper_process.stderr.read()
+        if aplay_process.stderr is not None:
+            aplay_stderr = aplay_process.stderr.read()
+
+        if piper_return_code != 0:
+            err = piper_stderr.decode("utf-8", errors="replace").strip()
+            raise RuntimeError(f"Piper failed with code {piper_return_code}: {err}")
+        if aplay_return_code != 0:
+            err = aplay_stderr.decode("utf-8", errors="replace").strip()
+            raise RuntimeError(f"Audio playback failed with code {aplay_return_code}: {err}")
+    except SpeechInterrupted:
+        _terminate_process(piper_process)
+        _terminate_process(aplay_process)
+        raise
+    finally:
+        manager.unregister_process(piper_process)
+        manager.unregister_process(aplay_process)
 
 
 def _run_espeak(text: str) -> None:
@@ -94,33 +130,36 @@ def play_wav_file(path: str) -> None:
     if not Path(file_path).is_file():
         raise RuntimeError(f"WAV file not found: {file_path}")
 
-    result = subprocess.run(
-        [APLAY_PATH, file_path],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        err = (result.stderr or "").strip()
-        raise RuntimeError(f"Audio playback failed with code {result.returncode}: {err}")
+    manager = get_speech_manager()
+
+    def runner(generation: int) -> None:
+        _play_wav_file_blocking(file_path, generation, manager)
+
+    manager.start_speech(runner, label="wav-file")
 
 
 def play_wav_bytes(audio: bytes) -> None:
     if not audio:
         raise RuntimeError("No audio bytes provided")
     print(f"[TTS] playback=wav-bytes bytes={len(audio)}")
-    temp_file = None
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
-            temp_file.write(audio)
-            temp_file.flush()
-            temp_path = temp_file.name
-        play_wav_file(temp_path)
-    finally:
-        if temp_file is not None:
-            try:
-                os.unlink(temp_file.name)
-            except OSError:
-                pass
+    manager = get_speech_manager()
+
+    def runner(generation: int) -> None:
+        temp_path = ""
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
+                temp_file.write(audio)
+                temp_file.flush()
+                temp_path = temp_file.name
+            _play_wav_file_blocking(temp_path, generation, manager)
+        finally:
+            if temp_path:
+                try:
+                    os.unlink(temp_path)
+                except OSError:
+                    pass
+
+    manager.start_speech(runner, label="wav-bytes")
 
 
 def speak(text, allow_espeak_fallback=None):
@@ -132,11 +171,63 @@ def speak(text, allow_espeak_fallback=None):
     print(f"[TTS] path=local-piper chars={len(message)} fallback_espeak={int(fallback_enabled)}")
     print(f"Jarvis says: {message}")
 
-    try:
-        _run_piper(message)
-    except Exception as exc:
-        if not fallback_enabled:
-            raise RuntimeError(f"Piper TTS failed: {exc}") from exc
+    manager = get_speech_manager()
 
-        print(f"[TTS] fallback=espeak reason=piper_error detail={exc}")
-        _run_espeak(message)
+    def runner(generation: int) -> None:
+        try:
+            _run_piper(message, generation, manager)
+        except SpeechInterrupted:
+            raise
+        except Exception as exc:
+            if not fallback_enabled:
+                raise RuntimeError(f"Piper TTS failed: {exc}") from exc
+
+            # eSpeak playback is blocking and not process-tracked; use only as optional fallback.
+            print(f"[TTS] fallback=espeak reason=piper_error detail={exc}")
+            _run_espeak(message)
+
+    manager.start_speech(runner, label="local-piper")
+
+
+def stop_speech() -> dict[str, int]:
+    return get_speech_manager().stop_speech()
+
+
+def is_speaking() -> bool:
+    return get_speech_manager().is_speaking()
+
+
+def _play_wav_file_blocking(file_path: str, generation: int, manager) -> None:
+    process = subprocess.Popen(
+        [APLAY_PATH, file_path],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+    )
+    manager.register_process(process, generation)
+    stderr_bytes = b""
+    try:
+        return_code = _wait_process_interruptible(process, generation, manager)
+        if process.stderr is not None:
+            stderr_bytes = process.stderr.read()
+        if return_code != 0:
+            err = stderr_bytes.decode("utf-8", errors="replace").strip()
+            raise RuntimeError(f"Audio playback failed with code {return_code}: {err}")
+    except SpeechInterrupted:
+        _terminate_process(process)
+        raise
+    finally:
+        manager.unregister_process(process)
+
+
+def _terminate_process(proc: subprocess.Popen) -> None:
+    if proc.poll() is not None:
+        return
+    try:
+        proc.terminate()
+        try:
+            proc.wait(timeout=0.15)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=0.15)
+    except Exception:
+        pass
