@@ -1,0 +1,23 @@
+{
+  "id": "hue_lights",
+  "name": "Philips Hue Lights Skill",
+  "description": "Controls Philips Hue power state for lights and rooms through a local Hue Bridge.",
+  "entry_class": "HueLightsSkill",
+  "trigger_phrases": [
+    "hue light",
+    "hue lights",
+    "pair hue bridge",
+    "connect hue bridge",
+    "setup hue bridge",
+    "turn on the light",
+    "turn off the light",
+    "turn on the lights",
+    "turn off the lights",
+    "lights on",
+    "lights off",
+    "lamp on",
+    "lamp off"
+  ],
+  "priority": 40,
+  "enabled": true
+}

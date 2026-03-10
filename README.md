@@ -154,6 +154,15 @@ Core-specific optional model overrides:
 - `JARVIS_SKILLS_DIR` (default: `<repo>/skills`)
   - Location of local installed skills loaded by Core at startup.
 
+## Philips Hue skill (skills/hue_lights)
+
+- `HUE_BRIDGE_IP`
+  - Default: unset
+  - Required by Hue skill. Bridge IP or hostname on your LAN.
+- `HUE_APP_KEY`
+  - Default: unset
+  - Required by Hue skill. Hue API application key.
+
 ## OpenAI (optional SDK-level)
 
 These are supported by the OpenAI SDK if needed for custom deployments:
@@ -281,6 +290,10 @@ JARVIS_TTS_MODE="core_only"
 JARVIS_TTS_VOICE="alloy"
 JARVIS_TTS_INSTRUCTIONS="Speak in clear British English with a consistent, natural assistant tone."
 
+# Philips Hue skill
+HUE_BRIDGE_IP="192.168.1.50"
+HUE_APP_KEY="your-hue-application-key"
+
 # Piper TTS
 PIPER_PATH="/home/robcowell/piper/build/piper"
 # Use a British model path if you run local-only TTS.
@@ -315,6 +328,26 @@ WAKE_DETECTION_COOLDOWN="1.5"
 WAKE_RECORDER_RESTART_RETRIES="8"
 WAKE_RECORDER_RESTART_DELAY="0.15"
 ```
+
+## Philips Hue quick setup (MVP)
+
+1. Ensure the new skill files exist under `skills/hue_lights/`.
+2. Discover your bridge IP from your router or the Hue mobile app.
+3. Press the physical button on your Hue Bridge.
+4. From this repo, run the guided pairing helper:
+
+```bash
+python -m core.tools.hue_pair --bridge-ip <bridge-ip>
+```
+
+5. Copy the printed `HUE_APP_KEY` and set it in your environment.
+6. Restart Core so the updated environment is loaded.
+
+Example commands:
+
+- "turn on the lights"
+- "turn off the office lights"
+- "switch on kitchen lamp"
 
 ## Notes
 
