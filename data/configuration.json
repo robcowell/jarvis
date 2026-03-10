@@ -1,0 +1,73 @@
+{
+  "command": {
+    "model": "gpt-5"
+  },
+  "core": {
+    "host": "0.0.0.0",
+    "port": 8000,
+    "timeout_seconds": 20.0,
+    "tts_timeout_seconds": 20.0,
+    "url": ""
+  },
+  "integrations": {
+    "calendar": {
+      "enabled": false
+    },
+    "home_assistant": {
+      "enabled": false,
+      "url": ""
+    }
+  },
+  "piper": {
+    "executable_path": "/home/robcowell/piper/build/piper",
+    "model_path": "/home/robcowell/piper/voices/en_US-lessac-medium.onnx"
+  },
+  "registered_consoles": [
+    {
+      "device_id": "pi-console",
+      "location": "unknown",
+      "preferred": true
+    }
+  ],
+  "voice": {
+    "audio_device_index": -1,
+    "chunk_size": 1024,
+    "max_duration": 6.0,
+    "min_speech_duration": 0.35,
+    "no_speech_timeout": 2.0,
+    "pre_roll_chunks": 2,
+    "sample_rate": 16000,
+    "silence_duration": 0.75,
+    "speech_threshold": 0.012
+  },
+  "wake": {
+    "always_listen_enabled": false,
+    "detection_cooldown": 1.5,
+    "enabled": true,
+    "porcupine": {
+      "access_key": "",
+      "audio_device_index": null,
+      "keywords": [
+        "jarvis"
+      ],
+      "restart_delay": 0.15,
+      "restart_retries": 8,
+      "sensitivity": 0.6
+    },
+    "words": [
+      "jarvis"
+    ]
+  },
+  "transcribe": {
+    "model": "gpt-4o-mini-transcribe"
+  },
+  "tts_engine": {
+    "aplay_path": "aplay",
+    "instructions": "Speak in clear British English with a consistent, natural assistant tone.",
+    "mode": "core_only",
+    "model": "gpt-4o-mini-tts",
+    "provider": "openai",
+    "sample_rate": 22050,
+    "voice": "ballad"
+  }
+}

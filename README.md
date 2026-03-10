@@ -39,11 +39,29 @@ Console modules now live under `console/` with root-level compatibility shims st
 - `core/skills/` - Skill framework (manifest parsing, registry, router, result schema)
 - `skills/<skill_name>/manifest.json` + `skills/<skill_name>/skill.py` - Installed local skills
 - `shared/schemas.py` - Shared API request/response models
+- `shared/memory/` - JSON-backed preferences/configuration service
+- `data/preferences.json` - Persisted user preferences
+- `data/configuration.json` - Persisted system configuration
 - `docs/distributed-architecture.md` - Refactor notes
 - `app.py`, `record.py`, `wake_listener.py`, `wakeword.py`, `speak.py` - compatibility shims
 - `templates/index.html` - Main UI template
 - `static/css/jarvis.css` - UI styles
 - `static/js/jarvis-ui.js` - UI behavior
+
+## Persisted preferences/configuration (v1)
+
+J.A.R.V.I.S. now includes a lightweight JSON-backed memory/config layer for:
+
+- User preferences (`data/preferences.json`)
+- System configuration (`data/configuration.json`)
+
+Design notes:
+
+- Preferences and configuration are intentionally separate.
+- Access goes through `shared.memory` helper methods/services instead of scattered direct file I/O.
+- Environment variables still override persisted values for runtime compatibility.
+- Optional override: set `JARVIS_DATA_DIR` to store these JSON files in another directory.
+- Persisted config now covers core client timeouts, wake-word settings, and voice endpointing defaults.
 
 ## Requirements
 

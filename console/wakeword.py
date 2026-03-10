@@ -1,8 +1,14 @@
 import os
 import re
 
+from shared.memory import get_memory_service
+
+_memory = get_memory_service()
+
 
 def _parse_bool(value: str, default: bool) -> bool:
+    if isinstance(value, bool):
+        return value
     if value is None:
         return default
     normalized = value.strip().lower()
@@ -14,12 +20,21 @@ def _parse_bool(value: str, default: bool) -> bool:
 
 
 def _load_wake_words() -> list[str]:
-    configured = os.getenv("WAKE_WORDS", "jarvis")
-    words = [part.strip().lower() for part in configured.split(",") if part.strip()]
+    configured = os.getenv("WAKE_WORDS")
+    if configured is None or configured.strip() == "":
+        configured = _memory.configuration.get("wake.words", ["jarvis"])
+
+    if isinstance(configured, list):
+        words = [str(part).strip().lower() for part in configured if str(part).strip()]
+    else:
+        words = [part.strip().lower() for part in str(configured).split(",") if part.strip()]
     return words or ["jarvis"]
 
 
-WAKE_WORD_ENABLED = _parse_bool(os.getenv("WAKE_WORD_ENABLED"), True)
+WAKE_WORD_ENABLED = _parse_bool(
+    os.getenv("WAKE_WORD_ENABLED"),
+    bool(_memory.configuration.get("wake.enabled", True)),
+)
 WAKE_WORDS = _load_wake_words()
 WAKE_WORD_DISPLAY = WAKE_WORDS[0]
 

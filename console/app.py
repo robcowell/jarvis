@@ -10,6 +10,7 @@ from console import record
 from console import speak
 from console import wakeword
 from console import wake_listener
+from shared.memory import get_memory_service
 import transcribe
 import brain
 
@@ -26,8 +27,15 @@ _event_id = 0
 _events = deque(maxlen=80)
 _wake_service = None
 _wake_status = "Off"
-_console_device_id = os.getenv("JARVIS_DEVICE_ID", "pi-console")
-_console_location = os.getenv("JARVIS_DEVICE_LOCATION", "unknown")
+_memory = get_memory_service()
+_console_device_id = os.getenv(
+    "JARVIS_DEVICE_ID",
+    str(_memory.configuration.get("registered_consoles.0.device_id", "pi-console")),
+)
+_console_location = os.getenv(
+    "JARVIS_DEVICE_LOCATION",
+    str(_memory.configuration.get("registered_consoles.0.location", "unknown")),
+)
 
 
 def _parse_tts_mode(value: str) -> str:
@@ -40,7 +48,12 @@ def _parse_tts_mode(value: str) -> str:
     return "core_only"
 
 
-_tts_mode = _parse_tts_mode(os.getenv("JARVIS_TTS_MODE", "core_only"))
+_tts_mode = _parse_tts_mode(
+    os.getenv(
+        "JARVIS_TTS_MODE",
+        str(_memory.configuration.get("tts_engine.mode", "core_only")),
+    )
+)
 _LOCAL_INTERRUPT_PHRASES = {
     "stop",
     "cancel",

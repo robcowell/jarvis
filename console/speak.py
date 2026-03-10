@@ -6,12 +6,20 @@ import time
 from pathlib import Path
 
 from console.speech_manager import SpeechInterrupted, get_speech_manager
+from shared.memory import get_memory_service
 
 # TTS runtime configuration (override with environment variables on the Pi).
-PIPER_PATH = os.getenv("PIPER_PATH", "/home/robcowell/piper/build/piper").strip()
-PIPER_MODEL_PATH = os.getenv("PIPER_MODEL_PATH", "/home/robcowell/piper/voices/en_US-lessac-medium.onnx").strip()
-PIPER_SAMPLE_RATE = int(os.getenv("PIPER_SAMPLE_RATE", "22050"))
-APLAY_PATH = os.getenv("APLAY_PATH", "aplay").strip()
+_memory = get_memory_service()
+PIPER_PATH = os.getenv(
+    "PIPER_PATH",
+    str(_memory.configuration.get("piper.executable_path", "/home/robcowell/piper/build/piper")),
+).strip()
+PIPER_MODEL_PATH = os.getenv(
+    "PIPER_MODEL_PATH",
+    str(_memory.configuration.get("piper.model_path", "/home/robcowell/piper/voices/en_US-lessac-medium.onnx")),
+).strip()
+PIPER_SAMPLE_RATE = int(os.getenv("PIPER_SAMPLE_RATE", str(_memory.configuration.get("tts_engine.sample_rate", 22050))))
+APLAY_PATH = os.getenv("APLAY_PATH", str(_memory.configuration.get("tts_engine.aplay_path", "aplay"))).strip()
 ESPEAK_PATH = os.getenv("ESPEAK_PATH", "espeak").strip()
 TTS_FALLBACK_TO_ESPEAK = os.getenv("TTS_FALLBACK_TO_ESPEAK", "0").strip().lower() not in {"0", "false", "no"}
 

@@ -3,12 +3,20 @@ import threading
 import time
 from typing import Callable, Optional
 
+from shared.memory import get_memory_service
 
-def _env_bool(name: str, default: bool) -> bool:
+_memory = get_memory_service()
+
+
+def _env_bool(name: str, config_key: str, default: bool) -> bool:
     raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        raw = _memory.configuration.get(config_key, default)
+    if isinstance(raw, bool):
+        return raw
     if raw is None:
-        return default
-    normalized = raw.strip().lower()
+        return bool(default)
+    normalized = str(raw).strip().lower()
     if normalized in {"1", "true", "yes", "on"}:
         return True
     if normalized in {"0", "false", "no", "off"}:
@@ -16,9 +24,11 @@ def _env_bool(name: str, default: bool) -> bool:
     return default
 
 
-def _env_float(name: str, default: float, minimum: Optional[float] = None) -> float:
+def _env_float(name: str, config_key: str, default: float, minimum: Optional[float] = None) -> float:
     raw = os.getenv(name)
     if raw is None or raw.strip() == "":
+        raw = _memory.configuration.get(config_key, default)
+    if raw is None or (isinstance(raw, str) and raw.strip() == ""):
         value = float(default)
     else:
         try:
@@ -30,26 +40,48 @@ def _env_float(name: str, default: float, minimum: Optional[float] = None) -> fl
     return value
 
 
-def _env_optional_int(name: str) -> Optional[int]:
+def _env_optional_int(name: str, config_key: str) -> Optional[int]:
     raw = os.getenv(name)
     if raw is None or raw.strip() == "":
+        raw = _memory.configuration.get(config_key, None)
+    if raw is None or (isinstance(raw, str) and raw.strip() == ""):
         return None
     try:
         return int(raw)
-    except ValueError:
+    except (TypeError, ValueError):
         return None
 
 
-WAKE_ALWAYS_LISTEN_ENABLED = _env_bool("WAKE_ALWAYS_LISTEN_ENABLED", False)
-PORCUPINE_KEYWORDS = [part.strip() for part in os.getenv("PORCUPINE_KEYWORDS", "jarvis").split(",") if part.strip()]
-PORCUPINE_SENSITIVITY = _env_float("PORCUPINE_SENSITIVITY", 0.6, minimum=0.0)
-WAKE_DETECTION_COOLDOWN = _env_float("WAKE_DETECTION_COOLDOWN", 1.5, minimum=0.0)
-PORCUPINE_AUDIO_DEVICE_INDEX = _env_optional_int("PORCUPINE_AUDIO_DEVICE_INDEX")
-WAKE_RECORDER_RESTART_RETRIES = max(1, int(_env_float("WAKE_RECORDER_RESTART_RETRIES", 8, minimum=1)))
-WAKE_RECORDER_RESTART_DELAY = _env_float("WAKE_RECORDER_RESTART_DELAY", 0.15, minimum=0.01)
+def _load_keywords() -> list[str]:
+    raw = os.getenv("PORCUPINE_KEYWORDS")
+    if raw is None or raw.strip() == "":
+        raw = _memory.configuration.get("wake.porcupine.keywords", ["jarvis"])
+    if isinstance(raw, list):
+        words = [str(part).strip() for part in raw if str(part).strip()]
+        return words or ["jarvis"]
+    words = [part.strip() for part in str(raw).split(",") if part.strip()]
+    return words or ["jarvis"]
+
+
+WAKE_ALWAYS_LISTEN_ENABLED = _env_bool("WAKE_ALWAYS_LISTEN_ENABLED", "wake.always_listen_enabled", False)
+PORCUPINE_KEYWORDS = _load_keywords()
+PORCUPINE_SENSITIVITY = _env_float("PORCUPINE_SENSITIVITY", "wake.porcupine.sensitivity", 0.6, minimum=0.0)
+WAKE_DETECTION_COOLDOWN = _env_float("WAKE_DETECTION_COOLDOWN", "wake.detection_cooldown", 1.5, minimum=0.0)
+PORCUPINE_AUDIO_DEVICE_INDEX = _env_optional_int("PORCUPINE_AUDIO_DEVICE_INDEX", "wake.porcupine.audio_device_index")
+WAKE_RECORDER_RESTART_RETRIES = max(
+    1,
+    int(_env_float("WAKE_RECORDER_RESTART_RETRIES", "wake.porcupine.restart_retries", 8, minimum=1)),
+)
+WAKE_RECORDER_RESTART_DELAY = _env_float(
+    "WAKE_RECORDER_RESTART_DELAY",
+    "wake.porcupine.restart_delay",
+    0.15,
+    minimum=0.01,
+)
 PICOVOICE_ACCESS_KEY = (
     (os.getenv("PICOVOICE_ACCESS_KEY") or "").strip()
     or (os.getenv("PORCUPINE_ACCESS_KEY") or "").strip()
+    or str(_memory.configuration.get("wake.porcupine.access_key", "")).strip()
 )
 
 

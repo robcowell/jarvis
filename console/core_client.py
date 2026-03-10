@@ -3,25 +3,41 @@ from pathlib import Path
 import time
 
 import requests
+from shared.memory import get_memory_service
 
 
 class CoreUnavailableError(RuntimeError):
     """Raised when the core cannot be reached or returns invalid data."""
 
 
-def _env_float(name: str, fallback: float) -> float:
+_memory = get_memory_service()
+
+
+def _env_or_config(name: str, config_key: str, fallback):
     raw = os.getenv(name)
-    if raw is None or not raw.strip():
+    if raw is not None and raw.strip():
+        return raw.strip()
+    value = _memory.configuration.get(config_key, fallback)
+    return value if value is not None else fallback
+
+
+def _env_float(name: str, config_key: str, fallback: float) -> float:
+    raw = _env_or_config(name, config_key, fallback)
+    if raw is None:
         return float(fallback)
     try:
         return float(raw)
-    except ValueError:
+    except (TypeError, ValueError):
         return float(fallback)
 
 
-JARVIS_CORE_URL = (os.getenv("JARVIS_CORE_URL") or "").strip().rstrip("/")
-JARVIS_CORE_TIMEOUT_SECONDS = _env_float("JARVIS_CORE_TIMEOUT_SECONDS", 20.0)
-JARVIS_CORE_TTS_TIMEOUT_SECONDS = _env_float("JARVIS_CORE_TTS_TIMEOUT_SECONDS", JARVIS_CORE_TIMEOUT_SECONDS)
+JARVIS_CORE_URL = str(_env_or_config("JARVIS_CORE_URL", "core.url", "")).strip().rstrip("/")
+JARVIS_CORE_TIMEOUT_SECONDS = _env_float("JARVIS_CORE_TIMEOUT_SECONDS", "core.timeout_seconds", 20.0)
+JARVIS_CORE_TTS_TIMEOUT_SECONDS = _env_float(
+    "JARVIS_CORE_TTS_TIMEOUT_SECONDS",
+    "core.tts_timeout_seconds",
+    JARVIS_CORE_TIMEOUT_SECONDS,
+)
 
 
 def is_enabled() -> bool:

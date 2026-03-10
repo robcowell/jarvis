@@ -4,11 +4,16 @@ from collections import deque
 
 import numpy as np
 from pvrecorder import PvRecorder
+from shared.memory import get_memory_service
+
+_memory = get_memory_service()
 
 
-def _env_float(name, fallback, minimum=None):
+def _env_float(name, config_key, fallback, minimum=None):
     raw = os.getenv(name)
     if raw is None or raw.strip() == "":
+        raw = _memory.configuration.get(config_key, fallback)
+    if raw is None or (isinstance(raw, str) and raw.strip() == ""):
         value = float(fallback)
     else:
         try:
@@ -21,9 +26,11 @@ def _env_float(name, fallback, minimum=None):
     return value
 
 
-def _env_int(name, fallback, minimum=None):
+def _env_int(name, config_key, fallback, minimum=None):
     raw = os.getenv(name)
     if raw is None or raw.strip() == "":
+        raw = _memory.configuration.get(config_key, fallback)
+    if raw is None or (isinstance(raw, str) and raw.strip() == ""):
         value = int(fallback)
     else:
         try:
@@ -37,15 +44,15 @@ def _env_int(name, fallback, minimum=None):
 
 
 # Speech endpoint defaults (overridable via environment variables).
-DEFAULT_MAX_DURATION = _env_float("VOICE_MAX_DURATION", 6.0, minimum=0.5)
-DEFAULT_SAMPLE_RATE = _env_int("VOICE_SAMPLE_RATE", 16000, minimum=8000)
-DEFAULT_CHUNK_SIZE = _env_int("VOICE_CHUNK_SIZE", 1024, minimum=128)
-DEFAULT_SPEECH_THRESHOLD = _env_float("VOICE_SPEECH_THRESHOLD", 0.012, minimum=0.001)
-DEFAULT_SILENCE_DURATION = _env_float("VOICE_SILENCE_DURATION", 0.75, minimum=0.1)
-DEFAULT_MIN_SPEECH_DURATION = _env_float("VOICE_MIN_SPEECH_DURATION", 0.35, minimum=0.1)
-DEFAULT_NO_SPEECH_TIMEOUT = _env_float("VOICE_NO_SPEECH_TIMEOUT", 2.0, minimum=0.2)
-DEFAULT_PRE_ROLL_CHUNKS = _env_int("VOICE_PRE_ROLL_CHUNKS", 2, minimum=1)
-DEFAULT_DEVICE_INDEX = _env_int("VOICE_AUDIO_DEVICE_INDEX", -1, minimum=-1)
+DEFAULT_MAX_DURATION = _env_float("VOICE_MAX_DURATION", "voice.max_duration", 6.0, minimum=0.5)
+DEFAULT_SAMPLE_RATE = _env_int("VOICE_SAMPLE_RATE", "voice.sample_rate", 16000, minimum=8000)
+DEFAULT_CHUNK_SIZE = _env_int("VOICE_CHUNK_SIZE", "voice.chunk_size", 1024, minimum=128)
+DEFAULT_SPEECH_THRESHOLD = _env_float("VOICE_SPEECH_THRESHOLD", "voice.speech_threshold", 0.012, minimum=0.001)
+DEFAULT_SILENCE_DURATION = _env_float("VOICE_SILENCE_DURATION", "voice.silence_duration", 0.75, minimum=0.1)
+DEFAULT_MIN_SPEECH_DURATION = _env_float("VOICE_MIN_SPEECH_DURATION", "voice.min_speech_duration", 0.35, minimum=0.1)
+DEFAULT_NO_SPEECH_TIMEOUT = _env_float("VOICE_NO_SPEECH_TIMEOUT", "voice.no_speech_timeout", 2.0, minimum=0.2)
+DEFAULT_PRE_ROLL_CHUNKS = _env_int("VOICE_PRE_ROLL_CHUNKS", "voice.pre_roll_chunks", 2, minimum=1)
+DEFAULT_DEVICE_INDEX = _env_int("VOICE_AUDIO_DEVICE_INDEX", "voice.audio_device_index", -1, minimum=-1)
 
 
 def get_input_devices():

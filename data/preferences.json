@@ -1,0 +1,12 @@
+{
+  "briefing": {
+    "enabled": true,
+    "include_calendar": true,
+    "include_weather": true,
+    "time_of_day": "morning"
+  },
+  "preferred_console": "pi-console",
+  "preferred_voice": "ballad",
+  "proactive_announcements_enabled": true,
+  "verbosity": "normal"
+}

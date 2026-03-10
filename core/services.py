@@ -7,17 +7,30 @@ from openai import OpenAI
 
 from core.skills.router import CommandRouter
 from core.skills.registry import SkillRegistry
+from shared.memory import get_memory_service
 
 
 _client: OpenAI | None = None
-_CHAT_MODEL = os.getenv("JARVIS_COMMAND_MODEL", "gpt-5")
-_TRANSCRIBE_MODEL = os.getenv("JARVIS_TRANSCRIBE_MODEL", "gpt-4o-mini-transcribe")
-_TTS_MODEL = os.getenv("JARVIS_TTS_MODEL", "gpt-4o-mini-tts")
-_TTS_VOICE = os.getenv("JARVIS_TTS_VOICE", "ballad")
-_TTS_INSTRUCTIONS = os.getenv(
+_memory = get_memory_service()
+
+
+def _env_or_config(env_name: str, config_key: str, fallback: str) -> str:
+    env_value = os.getenv(env_name)
+    if env_value is not None and env_value.strip():
+        return env_value.strip()
+    value = _memory.configuration.get(config_key, fallback)
+    return str(value).strip() if value is not None else fallback
+
+
+_CHAT_MODEL = _env_or_config("JARVIS_COMMAND_MODEL", "command.model", "gpt-5")
+_TRANSCRIBE_MODEL = _env_or_config("JARVIS_TRANSCRIBE_MODEL", "transcribe.model", "gpt-4o-mini-transcribe")
+_TTS_MODEL = _env_or_config("JARVIS_TTS_MODEL", "tts_engine.model", "gpt-4o-mini-tts")
+_TTS_VOICE = _env_or_config("JARVIS_TTS_VOICE", "tts_engine.voice", "ballad")
+_TTS_INSTRUCTIONS = _env_or_config(
     "JARVIS_TTS_INSTRUCTIONS",
+    "tts_engine.instructions",
     "Speak in clear British English with a consistent, natural assistant tone.",
-).strip()
+)
 _DEFAULT_SKILLS_ROOT = Path(__file__).resolve().parent.parent / "skills"
 _SKILLS_ROOT = Path(os.getenv("JARVIS_SKILLS_DIR", str(_DEFAULT_SKILLS_ROOT))).resolve()
 _skill_registry = SkillRegistry(skills_root=_SKILLS_ROOT)
