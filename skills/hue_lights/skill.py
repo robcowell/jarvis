@@ -59,6 +59,16 @@ class HueLightsSkill(BaseSkill):
         target_text = self._extract_target_text(context.text)
         try:
             if target_text is None:
+                if not self._is_all_lights_request(context.text):
+                    return SkillResult(
+                        ok=False,
+                        message=(
+                            "Please specify which light, room, or zone to control. "
+                            "You can also say turn on all lights."
+                        ),
+                        skill_id=self.skill_id,
+                        error="hue_target_required",
+                    )
                 changed = self._set_all_lights_power(bridge_ip=bridge_ip, app_key=app_key, is_on=intent_on)
                 state_word = "on" if intent_on else "off"
                 return SkillResult(
@@ -148,21 +158,17 @@ class HueLightsSkill(BaseSkill):
 
     def _extract_target_text(self, text: str) -> str | None:
         normalized = self._normalize_text(text)
-        if "all lights" in normalized:
+        if self._is_all_lights_request(normalized):
             return None
 
         target = ""
-        on_patterns = [
-            r"\bturn on\b(?P<target>.*)",
-            r"\bswitch on\b(?P<target>.*)",
-            r"\bpower on\b(?P<target>.*)",
+        patterns = [
+            r"\b(?:turn|switch|power)\s+on\b(?P<target>.*)",
+            r"\b(?:turn|switch|power)\s+off\b(?P<target>.*)",
+            r"\b(?:turn|switch|power)\b(?P<target>.*?)\bon\b",
+            r"\b(?:turn|switch|power)\b(?P<target>.*?)\boff\b",
         ]
-        off_patterns = [
-            r"\bturn off\b(?P<target>.*)",
-            r"\bswitch off\b(?P<target>.*)",
-            r"\bpower off\b(?P<target>.*)",
-        ]
-        for pattern in on_patterns + off_patterns:
+        for pattern in patterns:
             match = re.search(pattern, normalized)
             if match:
                 target = (match.group("target") or "").strip()
@@ -176,7 +182,11 @@ class HueLightsSkill(BaseSkill):
             if suffix_match:
                 target = (suffix_match.group("target") or "").strip()
 
-        target = re.sub(r"\b(the|please|in|at|my|hue|light|lights|lamp|lamps)\b", " ", target)
+        target = re.sub(
+            r"\b(the|please|in|at|my|hue|light|lights|lamp|lamps|turn|switch|power)\b",
+            " ",
+            target,
+        )
         target = re.sub(r"\s+", " ", target).strip()
         return target or None
 
@@ -185,6 +195,17 @@ class HueLightsSkill(BaseSkill):
         lowered = re.sub(r"[^a-z0-9\s]", " ", lowered)
         lowered = re.sub(r"\s+", " ", lowered)
         return lowered
+
+    def _is_all_lights_request(self, text: str) -> bool:
+        normalized = self._normalize_text(text)
+        all_lights_phrases = (
+            "all lights",
+            "all the lights",
+            "every light",
+            "every lamp",
+            "all lamps",
+        )
+        return any(phrase in normalized for phrase in all_lights_phrases)
 
     def _is_pairing_help_intent(self, text: str) -> bool:
         normalized = self._normalize_text(text)

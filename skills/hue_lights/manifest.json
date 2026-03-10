@@ -4,6 +4,10 @@
   "description": "Controls Philips Hue power state for lights and rooms through a local Hue Bridge.",
   "entry_class": "HueLightsSkill",
   "trigger_phrases": [
+    "light",
+    "lights",
+    "lamp",
+    "lamps",
     "hue light",
     "hue lights",
     "pair hue bridge",
