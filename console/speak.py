@@ -20,6 +20,7 @@ PIPER_MODEL_PATH = os.getenv(
 ).strip()
 PIPER_SAMPLE_RATE = int(os.getenv("PIPER_SAMPLE_RATE", str(_memory.configuration.get("tts_engine.sample_rate", 22050))))
 APLAY_PATH = os.getenv("APLAY_PATH", str(_memory.configuration.get("tts_engine.aplay_path", "aplay"))).strip()
+APLAY_DEVICE = os.getenv("APLAY_DEVICE", str(_memory.configuration.get("tts_engine.aplay_device", "default"))).strip() or "default"
 ESPEAK_PATH = os.getenv("ESPEAK_PATH", "espeak").strip()
 TTS_FALLBACK_TO_ESPEAK = os.getenv("TTS_FALLBACK_TO_ESPEAK", "0").strip().lower() not in {"0", "false", "no"}
 
@@ -65,7 +66,7 @@ def _run_piper(text: str, generation: int, manager) -> None:
         raise RuntimeError(f"Audio playback command not found: {APLAY_PATH}")
 
     piper_cmd = [piper_path, "--model", model_path, "--output-raw"]
-    aplay_cmd = [APLAY_PATH, "-r", str(PIPER_SAMPLE_RATE), "-f", "S16_LE", "-t", "raw", "-"]
+    aplay_cmd = _build_aplay_cmd("-r", str(PIPER_SAMPLE_RATE), "-f", "S16_LE", "-t", "raw", "-")
 
     piper_process = subprocess.Popen(
         piper_cmd,
@@ -207,7 +208,7 @@ def is_speaking() -> bool:
 
 def _play_wav_file_blocking(file_path: str, generation: int, manager) -> None:
     process = subprocess.Popen(
-        [APLAY_PATH, file_path],
+        _build_aplay_cmd(file_path),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
     )
@@ -239,3 +240,12 @@ def _terminate_process(proc: subprocess.Popen) -> None:
             proc.wait(timeout=0.15)
     except Exception:
         pass
+
+
+def _build_aplay_cmd(*args: str) -> list[str]:
+    # Route all playback through the default device by default for portability.
+    cmd = [APLAY_PATH]
+    if APLAY_DEVICE:
+        cmd.extend(["-D", APLAY_DEVICE])
+    cmd.extend(args)
+    return cmd

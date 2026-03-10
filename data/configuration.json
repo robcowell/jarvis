@@ -62,6 +62,7 @@
     "model": "gpt-4o-mini-transcribe"
   },
   "tts_engine": {
+    "aplay_device": "default",
     "aplay_path": "aplay",
     "instructions": "Speak in clear British English with a consistent, natural assistant tone.",
     "mode": "core_only",

@@ -188,6 +188,9 @@ If unset, the SDK uses its built-in defaults.
 - `APLAY_PATH`
   - Default: `aplay`
   - Playback command path/name
+- `APLAY_DEVICE`
+  - Default: `default`
+  - ALSA output device passed to `aplay -D` for console speaker playback
 - `TTS_FALLBACK_TO_ESPEAK`
   - Default: `0`
   - If Piper fails in local mode, fallback to eSpeak (`1`, `true`, `yes` enable; `0`, `false`, `no` disable)
@@ -297,6 +300,7 @@ PIPER_PATH="/home/robcowell/piper/build/piper"
 PIPER_MODEL_PATH="/home/robcowell/piper/voices/en_GB-voice.onnx"
 PIPER_SAMPLE_RATE="22050"
 APLAY_PATH="aplay"
+APLAY_DEVICE="default"
 TTS_FALLBACK_TO_ESPEAK="0"
 ESPEAK_PATH="espeak"
 
