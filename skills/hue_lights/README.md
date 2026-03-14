@@ -6,6 +6,8 @@ Controls Philips Hue power state via a local Hue Bridge using the plugin system.
 
 Current scope:
 - Turn lights on/off
+- Set brightness levels (1-100%)
+- Set named colors
 - Target a named light, room, or zone
 - Pairing guidance intent (`pair hue bridge`)
 
@@ -32,6 +34,9 @@ python -m core.tools.hue_pair --bridge-ip <bridge-ip>
 - `pair hue bridge`
 - `turn on kitchen light`
 - `turn office lamp off`
+- `set office lights to 35 percent`
+- `dim office lights to 20`
+- `set office lights to blue`
 - `turn on all lights`
 
 ## Safety behavior
