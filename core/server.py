@@ -1,6 +1,8 @@
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import Response
 
+from core import __build_datetime__ as CORE_BUILD_DATETIME
+from core import __version__ as CORE_VERSION
 from core import services
 from shared.schemas import (
     CommandRequest,
@@ -10,14 +12,20 @@ from shared.schemas import (
     SkillsResponse,
     TranscribeResponse,
     TtsRequest,
+    VersionResponse,
 )
 
-app = FastAPI(title="J.A.R.V.I.S. Core", version="0.1.0")
+app = FastAPI(title="J.A.R.V.I.S. Core", version=CORE_VERSION)
 
 
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
-    return HealthResponse()
+    return HealthResponse(version=CORE_VERSION, build_datetime=CORE_BUILD_DATETIME)
+
+
+@app.get("/version", response_model=VersionResponse)
+def version() -> VersionResponse:
+    return VersionResponse(version=CORE_VERSION, build_datetime=CORE_BUILD_DATETIME)
 
 
 @app.post("/transcribe", response_model=TranscribeResponse)

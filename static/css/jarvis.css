@@ -357,7 +357,7 @@ body::before {
 
 .footer {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   align-items: center;
   padding: 0 10px;
   font-size: 9px;
@@ -371,6 +371,19 @@ body::before {
   margin-top: 2px;
   font-size: 10px;
   color: var(--text);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.footer-item-version strong {
+  font-size: 9px;
+}
+
+.footer-meta {
+  display: block;
+  margin-top: 1px;
+  font-size: 8px;
+  color: var(--muted);
   letter-spacing: 0;
   text-transform: none;
 }
@@ -415,6 +428,10 @@ body::before {
   .main {
     grid-template-columns: 200px 1fr 210px;
     gap: 4px;
+  }
+
+  .footer {
+    grid-template-columns: repeat(7, 1fr);
   }
 
   .left,

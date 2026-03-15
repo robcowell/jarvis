@@ -23,6 +23,12 @@ Core-side (new):
 - LLM response generation via OpenAI (`/command`)
 - TTS generation as WAV (`/tts`)
 - Skills diagnostics (`/skills`)
+- Health + version confirmation (`/health`, `/version`)
+
+Console-side API (new):
+
+- Health endpoint (`/health`)
+- Version confirmation endpoint (`/version`) with both console and core metadata
 
 ## Project Structure
 
@@ -138,6 +144,20 @@ This section lists all environment variables used for configuration across the p
 - `JARVIS_CORE_TTS_TIMEOUT_SECONDS`
   - Default: same as `JARVIS_CORE_TIMEOUT_SECONDS`
   - Optional dedicated timeout for `POST /tts` so speech latency can be tuned independently.
+- `JARVIS_CORE_VERSION`
+  - Default: `0.1.0`
+  - Reported by Core `/health` and `/version`.
+- `JARVIS_CORE_BUILD_DATETIME`
+  - Default: `JARVIS_BUILD_DATETIME` or `unknown`
+  - Build timestamp reported by Core `/health` and `/version`.
+- `JARVIS_CONSOLE_VERSION`
+  - Default: `0.1.0`
+  - Reported by Console `/health` and `/version`.
+- `JARVIS_CONSOLE_BUILD_DATETIME`
+  - Default: `JARVIS_BUILD_DATETIME` or `unknown`
+  - Build timestamp reported by Console `/health` and `/version`.
+- `JARVIS_BUILD_DATETIME`
+  - Optional shared fallback build timestamp used by both Core and Console.
 - `JARVIS_TTS_MODE`
   - Default: `core_only`
   - `core_only` = normal mode. Use Core `/tts` only, then play returned WAV bytes.

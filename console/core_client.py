@@ -133,3 +133,17 @@ def tts(text: str) -> bytes:
             f"duration_ms={elapsed_ms} detail={exc}"
         )
         raise CoreUnavailableError(f"Core /tts unreachable: {exc}") from exc
+
+
+def version() -> dict:
+    try:
+        response = requests.get(_url("/version"), timeout=JARVIS_CORE_TIMEOUT_SECONDS)
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise CoreUnavailableError("Core /version returned invalid payload")
+        return payload
+    except requests.RequestException as exc:
+        raise CoreUnavailableError(f"Core /version unreachable: {exc}") from exc
+    except ValueError as exc:
+        raise CoreUnavailableError(f"Core /version returned invalid JSON: {exc}") from exc

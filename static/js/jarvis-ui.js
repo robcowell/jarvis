@@ -23,7 +23,11 @@ const ui = {
   clockBottom: document.getElementById("clockBottom"),
   wakeStatus: document.getElementById("wakeStatus"),
   cpuVal: document.getElementById("cpuVal"),
-  tempVal: document.getElementById("tempVal")
+  tempVal: document.getElementById("tempVal"),
+  consoleVersionVal: document.getElementById("consoleVersionVal"),
+  consoleBuildVal: document.getElementById("consoleBuildVal"),
+  coreVersionVal: document.getElementById("coreVersionVal"),
+  coreBuildVal: document.getElementById("coreBuildVal")
 };
 
 function stickToBottom(element) {
@@ -228,13 +232,85 @@ async function listen() {
   }
 }
 
+function setVersionDisplay(target, versionText, buildText) {
+  target.version.innerText = versionText;
+  target.build.innerText = buildText;
+}
+
+async function refreshVersions() {
+  try {
+    const response = await fetch("/version");
+    const data = await response.json();
+    if (!data || !data.ok) {
+      throw new Error("Invalid /version payload");
+    }
+
+    const consoleInfo = data.console || {};
+    const consoleVersion = String(consoleInfo.version || "unknown");
+    const consoleBuild = String(consoleInfo.build_datetime || "unknown");
+    setVersionDisplay(
+      {
+        version: ui.consoleVersionVal,
+        build: ui.consoleBuildVal
+      },
+      `v${consoleVersion}`,
+      `build ${consoleBuild}`
+    );
+
+    const coreInfo = data.core || {};
+    if (coreInfo.reachable === false) {
+      setVersionDisplay(
+        {
+          version: ui.coreVersionVal,
+          build: ui.coreBuildVal
+        },
+        "offline",
+        "build unavailable"
+      );
+      ui.coreBuildVal.title = String(coreInfo.error || "Core unavailable");
+      return;
+    }
+
+    const coreVersion = String(coreInfo.version || "unknown");
+    const coreBuild = String(coreInfo.build_datetime || "unknown");
+    setVersionDisplay(
+      {
+        version: ui.coreVersionVal,
+        build: ui.coreBuildVal
+      },
+      `v${coreVersion}`,
+      `build ${coreBuild}`
+    );
+    ui.coreBuildVal.title = "";
+  } catch (_err) {
+    setVersionDisplay(
+      {
+        version: ui.coreVersionVal,
+        build: ui.coreBuildVal
+      },
+      "offline",
+      "build unavailable"
+    );
+    setVersionDisplay(
+      {
+        version: ui.consoleVersionVal,
+        build: ui.consoleBuildVal
+      },
+      "v--",
+      "build --"
+    );
+  }
+}
+
 ui.voiceCore.addEventListener("click", listen);
 
 updateClocks();
 setWakeStatus("Off");
 setInterval(updateClocks, 1000);
 setInterval(pollEvents, 800);
+setInterval(refreshVersions, 30000);
 pollEvents();
+refreshVersions();
 
 // Lightweight simulated diagnostics keep the footer lively in offline/demo mode.
 setInterval(() => {

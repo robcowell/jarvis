@@ -6,7 +6,10 @@
   "trigger_phrases": [
     "system status",
     "jarvis status",
-    "status report"
+    "status report",
+    "core version",
+    "console version",
+    "build datetime"
   ],
   "priority": 50,
   "enabled": true

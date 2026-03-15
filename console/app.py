@@ -5,6 +5,8 @@ import re
 import threading
 
 from flask import Flask, render_template, request, jsonify
+from console import __build_datetime__ as CONSOLE_BUILD_DATETIME
+from console import __version__ as CONSOLE_VERSION
 from console import core_client
 from console import record
 from console import speak
@@ -98,6 +100,96 @@ def _is_local_interrupt_command(text: str) -> bool:
         if phrase.startswith("thats enough "):
             return True
     return False
+
+
+def _is_console_version_query(normalized: str) -> bool:
+    return (
+        ("console version" in normalized)
+        or ("console build" in normalized)
+        or (
+            "console" in normalized
+            and any(token in normalized for token in ("version", "build", "build date", "build datetime"))
+        )
+    )
+
+
+def _is_core_version_query(normalized: str) -> bool:
+    return (
+        ("core version" in normalized)
+        or ("core build" in normalized)
+        or (
+            "core" in normalized
+            and any(token in normalized for token in ("version", "build", "build date", "build datetime"))
+        )
+    )
+
+
+def _console_version_payload() -> dict:
+    return {
+        "service": "jarvis-console",
+        "version": CONSOLE_VERSION,
+        "build_datetime": CONSOLE_BUILD_DATETIME,
+    }
+
+
+def _core_version_payload() -> dict:
+    if not core_client.is_enabled():
+        return {
+            "service": "jarvis-core",
+            "reachable": False,
+            "error": "JARVIS_CORE_URL is not configured",
+        }
+    try:
+        payload = core_client.version()
+        return {
+            "service": str(payload.get("service", "jarvis-core")),
+            "version": str(payload.get("version", "unknown")),
+            "build_datetime": str(payload.get("build_datetime", "unknown")),
+            "reachable": True,
+        }
+    except core_client.CoreUnavailableError as exc:
+        return {
+            "service": "jarvis-core",
+            "reachable": False,
+            "error": str(exc),
+        }
+
+
+def _version_query_response(text: str) -> str | None:
+    normalized = _normalize_phrase(text)
+    if not normalized:
+        return None
+
+    if _is_console_version_query(normalized):
+        payload = _console_version_payload()
+        return (
+            f"Console version is {payload['version']}. "
+            f"Build datetime is {payload['build_datetime']}."
+        )
+
+    if _is_core_version_query(normalized):
+        payload = _core_version_payload()
+        if payload.get("reachable"):
+            return (
+                f"Core version is {payload['version']}. "
+                f"Build datetime is {payload['build_datetime']}."
+            )
+        return f"I can't confirm core version right now. {payload.get('error', 'Core unavailable.')}"
+
+    if "version" in normalized and "jarvis" in normalized:
+        console_payload = _console_version_payload()
+        core_payload = _core_version_payload()
+        if core_payload.get("reachable"):
+            return (
+                f"Console version is {console_payload['version']} built at {console_payload['build_datetime']}. "
+                f"Core version is {core_payload['version']} built at {core_payload['build_datetime']}."
+            )
+        return (
+            f"Console version is {console_payload['version']} built at {console_payload['build_datetime']}. "
+            f"Core version is unavailable: {core_payload.get('error', 'Core unavailable.')}."
+        )
+
+    return None
 
 
 def _emit_event(event_type, payload):
@@ -222,23 +314,27 @@ def _voice_pipeline(source="touch", emit_events=False):
                 "stop": stop_stats,
             }
 
-        if using_core:
-            try:
-                response = core_client.command(
-                    prompt_text,
-                    device_id=_console_device_id,
-                    location=_console_location
-                )
-            except core_client.CoreUnavailableError as exc:
-                print(f"Core command failed ({exc}). Falling back to local brain.")
-                _emit_event("core_status", {
-                    "ok": False,
-                    "error": str(exc),
-                    "stage": "command"
-                })
-                response = brain.ask_jarvis(prompt_text)
+        local_version_response = _version_query_response(prompt_text)
+        if local_version_response is not None:
+            response = local_version_response
         else:
-            response = brain.ask_jarvis(prompt_text)
+            if using_core:
+                try:
+                    response = core_client.command(
+                        prompt_text,
+                        device_id=_console_device_id,
+                        location=_console_location
+                    )
+                except core_client.CoreUnavailableError as exc:
+                    print(f"Core command failed ({exc}). Falling back to local brain.")
+                    _emit_event("core_status", {
+                        "ok": False,
+                        "error": str(exc),
+                        "stage": "command"
+                    })
+                    response = brain.ask_jarvis(prompt_text)
+            else:
+                response = brain.ask_jarvis(prompt_text)
 
         if emit_events:
             _emit_event("voice_state", {
@@ -341,6 +437,26 @@ def home():
     )
 
 
+@app.route("/health")
+def health():
+    return jsonify({
+        "ok": True,
+        "service": "jarvis-console",
+        "status": "healthy",
+        "version": CONSOLE_VERSION,
+        "build_datetime": CONSOLE_BUILD_DATETIME,
+    }), 200
+
+
+@app.route("/version")
+def version():
+    return jsonify({
+        "ok": True,
+        "console": _console_version_payload(),
+        "core": _core_version_payload(),
+    }), 200
+
+
 @app.route("/listen")
 def listen():
     try:
@@ -376,18 +492,22 @@ def ask():
                 "error": "No text provided"
             })
 
-        if core_client.is_enabled():
-            try:
-                response = core_client.command(
-                    text,
-                    device_id=_console_device_id,
-                    location=_console_location
-                )
-            except core_client.CoreUnavailableError as exc:
-                print(f"Core command failed ({exc}). Falling back to local brain.")
-                response = brain.ask_jarvis(text)
+        local_version_response = _version_query_response(text)
+        if local_version_response is not None:
+            response = local_version_response
         else:
-            response = brain.ask_jarvis(text)
+            if core_client.is_enabled():
+                try:
+                    response = core_client.command(
+                        text,
+                        device_id=_console_device_id,
+                        location=_console_location
+                    )
+                except core_client.CoreUnavailableError as exc:
+                    print(f"Core command failed ({exc}). Falling back to local brain.")
+                    response = brain.ask_jarvis(text)
+            else:
+                response = brain.ask_jarvis(text)
 
         return jsonify({
             "ok": True,

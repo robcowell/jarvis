@@ -32,6 +32,15 @@ class HealthResponse(BaseModel):
     ok: bool = True
     service: str = "jarvis-core"
     status: str = "healthy"
+    version: str = "0.1.0"
+    build_datetime: str = "unknown"
+
+
+class VersionResponse(BaseModel):
+    ok: bool = True
+    service: str = "jarvis-core"
+    version: str = "0.1.0"
+    build_datetime: str = "unknown"
 
 
 class SkillInfo(BaseModel):
