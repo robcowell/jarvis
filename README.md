@@ -161,6 +161,7 @@ Each plugin skill owns its documentation inside its own folder:
 - `skills/hello/README.md`
 - `skills/system_status/README.md`
 - `skills/hue_lights/README.md`
+- `skills/amazon_smart_home/README.md`
 
 Keep plugin-specific setup, env vars, and usage examples in those files.
 
