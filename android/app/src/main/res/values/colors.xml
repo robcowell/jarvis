@@ -1,0 +1,16 @@
+<resources>
+    <color name="bg_top">#0A1622</color>
+    <color name="bg_bottom">#040B12</color>
+    <color name="panel">#0A1724</color>
+    <color name="panel_soft">#0D1D2B</color>
+    <color name="line">#4050CDFF</color>
+    <color name="line_strong">#7050CDFF</color>
+    <color name="accent">#36D8FF</color>
+    <color name="text_primary">#E9FBFF</color>
+    <color name="text_muted">#95CFE2</color>
+    <color name="state_good">#8CFFC8</color>
+    <color name="state_warn">#FFD267</color>
+    <color name="state_bad">#FF7C98</color>
+    <color name="black_30">#4D000000</color>
+    <color name="white">#FFFFFF</color>
+</resources>

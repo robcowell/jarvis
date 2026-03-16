@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">Jarvis Android Console</string>
+    <string name="title_console">J.A.R.V.I.S. Android Console</string>
+    <string name="mode_label">Mode</string>
+    <string name="mode_value">Voice Console</string>
+    <string name="wake_label">Wake</string>
+    <string name="wake_value">Armed</string>
+    <string name="status_title">System Status</string>
+    <string name="status_idle">Idle</string>
+    <string name="status_sub_idle">Touch the core to speak</string>
+    <string name="transcript_title">Transcript + Response</string>
+    <string name="controls_title">Controls</string>
+    <string name="telemetry_title">Telemetry</string>
+    <string name="talk">Talk</string>
+    <string name="hint_core_url">Core URL (for emulator: http://10.0.2.2:8000)</string>
+    <string name="hint_device_id">Device ID (default: android-console)</string>
+    <string name="hint_location">Location (default: unknown)</string>
+    <string name="label_wake_word_enabled">Require wake word in transcript (jarvis)</string>
+    <string name="hint_command">Type command text (text-only path)</string>
+    <string name="button_health">Health</string>
+    <string name="button_version">Version</string>
+    <string name="button_listen">Listen</string>
+    <string name="button_stop_speech">Stop Speech</string>
+    <string name="button_send_text_only">Send Text Command</string>
+</resources>
